@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── DESIGN TOKENS ─────────────────────────────────────────────────────────
+ * All semantic color values live here as CSS custom properties.
+ * This site is always dark: data-theme="dark" is set on <html> and there is
+ * no light mode.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Backgrounds */
+  --bg-primary:   #080B12;
+  --bg-secondary: #0D1117;
+  --bg-tertiary:  #131A24;
+  --bg-terminal:  #0A0E18;
+
+  /* Text */
+  --text-primary:   #D5DDE0;
+  --text-secondary: #B5BEC8;
+  --text-tertiary:  #A8B2BF;
+  --text-muted:     #7E8898;
+
+  /* Borders */
+  --border-subtle:  #1E2737;
+  --border-default: #2A3444;
+  --border-accent:  rgba(30, 158, 138, 0.4);
+
+  /* Accent — teal (the one interactive accent: hover/focus/active) */
+  --accent-teal:      #1E9E8A;
+  --accent-teal-dim:  #17796A;
+  --accent-teal-glow: rgba(30, 158, 138, 0.4);
+
+  /* Accent — purple (vacationed category) */
+  --accent-purple:        #5B2D8E;
+  --accent-purple-soft:   #B89CE0;
+  --accent-purple-bright: #9B6FD4;
+
+  /* Category colors */
+  --category-lived:      #1E9E8A;
+  --category-vacationed: #9B6FD4;
+  --category-work:       #C9922A;
+  --category-planned:    #8294A6;
+
+  /* Atmosphere (physical, not brand) */
+  --atmosphere-blue: #7FB7E3;
+
+  /* Semantic */
+  --gold:        #C9922A;
+  --gold-bright: #E6B547;
+  --danger:      #E5484D;
+  --warn:        #F5A524;
+  --ok:          #46A758;
+
+  /* Selection */
+  --selection-bg: rgba(30, 158, 138, 0.3);
+
+  /* ── RGB channels for Tailwind opacity-modifier and color-mix() ──
+   * Space-separated (no commas) — required by rgb(var / <alpha-value>) syntax. */
+  --bg-primary-rgb:            8 11 18;
+  --bg-secondary-rgb:          13 17 23;
+  --bg-tertiary-rgb:           19 26 36;
+  --accent-teal-rgb:           30 158 138;
+  --accent-purple-bright-rgb:  155 111 212;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    background-color: var(--bg-primary);
+  }
+
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    position: relative;
+  }
+
+  ::selection {
+    background-color: var(--selection-bg);
+    color: var(--text-primary);
+  }
+
+  /* Layer hierarchy: globe canvas (z-0), floating glass UI (z-10+) */
+  main {
+    position: relative;
+    z-index: 10;
+  }
+}
+
+@layer components {
+  .section-container {
+    @apply mx-auto max-w-6xl px-6 sm:px-8;
+  }
+
+  /* === GLASS PANELS === */
+  .glass-panel {
+    @apply rounded-xl border;
+    background-color: rgba(13, 17, 23, 0.72);
+    backdrop-filter: blur(12px);
+    border-color: rgba(130, 148, 166, 0.18);
+  }
+
+  /* === TAGS / PILLS === */
+  .ac-tag {
+    @apply inline-block rounded-full px-2.5 py-1 font-mono text-[11px];
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    background-color: color-mix(in srgb, var(--bg-tertiary) 75%, transparent);
+  }
+
+  .ac-label {
+    @apply mb-1.5 block font-mono text-[11px] uppercase tracking-[0.18em];
+    color: var(--accent-teal);
+  }
+
+  /* === BUTTONS === */
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 rounded-md border px-4 py-2.5 font-body text-[13px] font-medium transition-all duration-200;
+    border-color: var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+  }
+  .btn-secondary:hover {
+    border-color: color-mix(in srgb, var(--accent-teal) 50%, transparent);
+    color: var(--accent-teal);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent-teal) 18%, transparent);
+  }
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--border-default) 140%, white);
+}
