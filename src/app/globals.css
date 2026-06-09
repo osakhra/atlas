@@ -136,6 +136,13 @@
     color: var(--accent-teal);
     box-shadow: 0 0 18px color-mix(in srgb, var(--accent-teal) 18%, transparent);
   }
+
+  /* === FOCUS RING ===
+   * Shared focus-visible treatment for interactive UI elements (sidebar
+   * tree items, buttons, links). Teal accent only, per design tokens. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-teal;
+  }
 }
 
 /* === SCROLLBAR === */
