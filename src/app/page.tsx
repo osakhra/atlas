@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import Legend from '@/components/Legend';
 import LocationCard from '@/components/LocationCard';
@@ -20,7 +20,23 @@ const flatPlaces = flattenPlaces(places);
  * selection and pass `selectedId` through to GlobeScene.
  */
 function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void }) {
-  const { selected } = useSelection();
+  const { selected, select } = useSelection();
+
+  // Deep link: select a place from the URL hash on first load.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id && findPlace(id)) {
+      select(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the URL hash in sync with the current selection (no history spam).
+  useEffect(() => {
+    const hash = selected ? `#${selected.id}` : '';
+    const url = `${window.location.pathname}${window.location.search}${hash}`;
+    window.history.replaceState(null, '', url);
+  }, [selected]);
 
   return (
     <>

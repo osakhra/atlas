@@ -76,9 +76,8 @@ export default function Sidebar({ tree }: SidebarProps) {
 
   const handleActivate = useCallback(
     (row: VisibleRow) => {
-      if (row.isLeaf) {
-        select(row.place.id);
-      } else {
+      select(row.place.id);
+      if (!row.isLeaf) {
         toggleExpanded(row.place.id);
       }
     },
@@ -158,7 +157,7 @@ export default function Sidebar({ tree }: SidebarProps) {
         }}
         role="treeitem"
         aria-expanded={isLeaf ? undefined : isExpanded}
-        aria-selected={isLeaf ? isSelected : undefined}
+        aria-selected={isSelected}
         aria-level={depth + 1}
         tabIndex={isFocused ? 0 : -1}
         onFocus={() => setFocusedId(place.id)}
