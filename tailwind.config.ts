@@ -69,14 +69,6 @@ const config: Config = {
         danger:      'var(--danger)',
         warn:        'var(--warn)',
         ok:          'var(--ok)',
-
-        // ── Status ────────────────────────────────────────────────────────────
-        status: {
-          'shipped-bg':     'var(--status-shipped-bg)',
-          'shipped-border': 'var(--status-shipped-border)',
-          'progress-bg':    'var(--status-progress-bg)',
-          'progress-border': 'var(--status-progress-border)',
-        },
       },
       fontFamily: {
         display: ['Sora', 'system-ui', 'sans-serif'],
