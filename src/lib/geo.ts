@@ -58,16 +58,16 @@ export function centroidOf(place: Place): { lat: number; lng: number } | null {
 export function altitudeForTier(tier: Tier): number {
   switch (tier) {
     case 'continent':
-      return 2.5;
+      return 1.6;
     case 'country':
-      return 1.4;
+      return 1.0;
     case 'state':
-      return 0.8;
-    case 'island':
       return 0.6;
-    case 'city':
+    case 'island':
       return 0.45;
+    case 'city':
+      return 0.32;
     case 'poi':
-      return 0.35;
+      return 0.24;
   }
 }

@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-
-// Baked sun angle. Tune so the Americas sit in daylight and Europe/Middle
-// East show city lights. Owner-adjustable constant.
-export const SUN_DIRECTION = new THREE.Vector3(-0.8, 0.35, 0.5).normalize();
+/**
+ * The point on Earth where the sun is directly overhead. Owner-tunable:
+ * increase lng eastward to push the Americas deeper into night.
+ */
+export const SUBSOLAR_POINT = { lat: 8, lng: 155 };

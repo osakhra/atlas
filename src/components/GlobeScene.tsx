@@ -6,8 +6,13 @@ import Globe, { type GlobeInstance } from 'globe.gl';
 import type { Place } from '@/lib/types';
 import { findPlace, centroidOf, altitudeForTier } from '@/lib/geo';
 import { tokens } from '@/data/tokens';
-import { SUN_DIRECTION } from '@/lib/sun';
-import { dayNightVertexShader, dayNightFragmentShader } from '@/lib/shaders';
+import { SUBSOLAR_POINT } from '@/lib/sun';
+import {
+  dayNightVertexShader,
+  dayNightFragmentShader,
+  atmosphereGlowVertexShader,
+  atmosphereGlowFragmentShader,
+} from '@/lib/shaders';
 
 export interface GlobeSceneHandle {
   /** Imperative camera fly-to, implemented via globe.pointOfView({lat,lng,altitude}, durationMs). */
@@ -19,7 +24,7 @@ export interface GlobeSceneProps {
   places: Place[];
   /** id of the currently selected place (leaf or branch), or null/undefined if none. */
   selectedId?: string | null;
-  /** Call once after globe.gl's onGlobeReady fires (textures loaded), so the page can dismiss its Preloader. */
+  /** Call once after the globe textures finish loading, so the page can dismiss its Preloader. */
   onReady?: () => void;
 }
 
@@ -27,11 +32,40 @@ const CLOUD_REVOLUTION_SECONDS = 40 * 60;
 const CLOUD_ANGULAR_SPEED = (2 * Math.PI) / CLOUD_REVOLUTION_SECONDS; // rad/sec
 const IDLE_RESUME_MS = 8000;
 
+// Outer fresnel glow sphere, relative to the globe radius (100). Must stay
+// below 100 * (1 + minimum camera altitude) -- poi tier altitude is 0.24, so
+// the hard ceiling is 124. Keep this <= 1.18.
+const GLOW_SCALE = 1.12;
+const GLOW_COLOR = new THREE.Color(0.4, 0.66, 1.0);
+
+// Pin sprite scale (world units). Selected pins scale up by 1.6x.
+const PIN_BASE_SCALE = 2.5;
+const PIN_SELECTED_SCALE = PIN_BASE_SCALE * 1.6;
+const PIN_OBJECT_ALTITUDE = 0.015;
+
+const CLOUDS_OPACITY = 0.18;
+
+// Opening camera position: Earth filling most of the frame.
+const OPENING_VIEW = { lat: 20, lng: -85, altitude: 1.35 };
+
 const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeScene(props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeInstance | null>(null);
+  const controlsRef = useRef<ReturnType<GlobeInstance['controls']> | null>(null);
   const cloudsRef = useRef<THREE.Mesh | null>(null);
+  const glowRef = useRef<THREE.Mesh | null>(null);
   const reducedMotionRef = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectionActiveRef = useRef(false);
+  const pinSpritesRef = useRef<Map<string, THREE.Sprite>>(new Map());
+  const selectedPinIdRef = useRef<string | null>(null);
+
+  // Disposable resources populated once textures finish loading.
+  const dayTextureRef = useRef<THREE.Texture | null>(null);
+  const nightTextureRef = useRef<THREE.Texture | null>(null);
+  const cloudsTextureRef = useRef<THREE.Texture | null>(null);
+  const globeMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const pinTextureRef = useRef<THREE.CanvasTexture | null>(null);
 
   // Latest props mirrored into refs so the init effect (which runs once) and
   // the rAF loop can read current values without re-subscribing.
@@ -50,6 +84,13 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
 
   useImperativeHandle(ref, () => ({ flyTo }), []);
 
+  const clearIdleTimer = () => {
+    if (idleTimerRef.current !== null) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  };
+
   // --- One-time globe setup -------------------------------------------------
   useEffect(() => {
     const container = containerRef.current;
@@ -58,16 +99,36 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     reducedMotionRef.current = reducedMotionQuery.matches;
 
+    // --- Pin sprite texture (shared, soft circular gradient) ----------------
+    const pinTexture = createPinTexture();
+    pinTextureRef.current = pinTexture;
+
+    const makePin = (place: Place): THREE.Sprite => {
+      const material = new THREE.SpriteMaterial({
+        map: pinTexture,
+        color: categoryColor(place.category),
+        depthTest: true,
+        depthWrite: false,
+        sizeAttenuation: true,
+        transparent: true,
+      });
+      const sprite = new THREE.Sprite(material);
+      const isSelected = place.id === selectedIdRef.current;
+      const scale = isSelected ? PIN_SELECTED_SCALE : PIN_BASE_SCALE;
+      sprite.scale.set(scale, scale, 1);
+      pinSpritesRef.current.set(place.id, sprite);
+      if (isSelected) selectedPinIdRef.current = place.id;
+      return sprite;
+    };
+
     const globe = new Globe(container)
       .backgroundImageUrl('/textures/night-sky.png')
-      .atmosphereColor(tokens.atmosphere)
-      .atmosphereAltitude(0.15)
-      .pointsData(placesRef.current)
-      .pointLat((d) => (d as Place).lat ?? 0)
-      .pointLng((d) => (d as Place).lng ?? 0)
-      .pointColor((d) => categoryColor((d as Place).category))
-      .pointAltitude(0.01)
-      .pointRadius((d) => ((d as Place).tier === 'city' ? 0.5 : 0.35))
+      .atmosphereAltitude(0)
+      .objectsData(placesRef.current)
+      .objectLat((d) => (d as Place).lat ?? 0)
+      .objectLng((d) => (d as Place).lng ?? 0)
+      .objectAltitude(PIN_OBJECT_ALTITUDE)
+      .objectThreeObject((d) => makePin(d as Place))
       .ringsData([])
       .ringLat((d: any) => d.lat)
       .ringLng((d: any) => d.lng)
@@ -76,72 +137,108 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       .ringPropagationSpeed(2)
       .ringRepeatPeriod(1800)
       .width(container.clientWidth)
-      .height(container.clientHeight)
-      .onGlobeReady(() => {
-        props.onReady?.();
-      });
+      .height(container.clientHeight);
 
     globeRef.current = globe;
 
-    // --- Day/night shader material -----------------------------------------
-    const textureLoader = new THREE.TextureLoader();
-    const dayTexture = textureLoader.load('/textures/earth-day.jpg');
-    const nightTexture = textureLoader.load('/textures/earth-night.jpg');
-    if ('SRGBColorSpace' in THREE) {
-      dayTexture.colorSpace = THREE.SRGBColorSpace;
-      nightTexture.colorSpace = THREE.SRGBColorSpace;
-    }
+    // Opening view: Earth massive, filling most of the frame. Set instantly
+    // (0ms) so there's no fly-in animation on first paint.
+    globe.pointOfView(OPENING_VIEW, 0);
 
-    const sunDirectionArray: [number, number, number] = [
-      SUN_DIRECTION.x,
-      SUN_DIRECTION.y,
-      SUN_DIRECTION.z,
-    ];
+    // --- Sun direction, derived from a subsolar point -----------------------
+    // globe.getCoords gives the position of that lat/lng on the globe's own
+    // (unrotated) sphere -- the same space the day/night shader's
+    // world-space normals live in, since the globe mesh itself never
+    // rotates (only the camera orbits).
+    const subsolar = globe.getCoords(SUBSOLAR_POINT.lat, SUBSOLAR_POINT.lng, 0);
+    const sunDirection = new THREE.Vector3(subsolar.x, subsolar.y, subsolar.z).normalize();
 
-    const globeMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        dayTexture: { value: dayTexture },
-        nightTexture: { value: nightTexture },
-        sunDirection: { value: new THREE.Vector3(...sunDirectionArray) },
-      },
-      vertexShader: dayNightVertexShader,
-      fragmentShader: dayNightFragmentShader,
-    });
-    globe.globeMaterial(globeMaterial as unknown as THREE.MeshPhongMaterial);
-
-    // --- Cloud layer ----------------------------------------------------------
-    const cloudsTexture = textureLoader.load('/textures/earth-clouds.png');
-    if ('SRGBColorSpace' in THREE) {
-      cloudsTexture.colorSpace = THREE.SRGBColorSpace;
-    }
+    // --- Atmospheric rim glow -------------------------------------------------
     const globeRadius = globe.getGlobeRadius();
-    const cloudsMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(globeRadius * 1.01, 64, 64),
-      new THREE.MeshPhongMaterial({
-        map: cloudsTexture,
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
+    const glowMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        glowColor: { value: GLOW_COLOR },
+      },
+      vertexShader: atmosphereGlowVertexShader,
+      fragmentShader: atmosphereGlowFragmentShader,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
+    const glowMesh = new THREE.Mesh(new THREE.SphereGeometry(globeRadius * GLOW_SCALE, 64, 64), glowMaterial);
+    glowRef.current = glowMesh;
+    globe.scene().add(glowMesh);
+
+    // --- Day/night shader material + cloud layer, once textures load --------
+    const renderer = globe.renderer();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const maxTextureSize = renderer.capabilities.maxTextureSize;
+    const dayTextureUrl = maxTextureSize >= 8192 ? '/textures/earth-day-8k.jpg' : '/textures/earth-day-4k.jpg';
+
+    const textureLoader = new THREE.TextureLoader();
+    const loadTexture = (url: string) =>
+      new Promise<THREE.Texture>((resolve, reject) => {
+        textureLoader.load(url, resolve, undefined, reject);
+      });
+
+    Promise.all([loadTexture(dayTextureUrl), loadTexture('/textures/earth-night.jpg'), loadTexture('/textures/earth-clouds.png')])
+      .then(([dayTexture, nightTexture, cloudsTexture]) => {
+        const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+        for (const tex of [dayTexture, nightTexture]) {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = maxAnisotropy;
+          tex.needsUpdate = true;
+        }
+        cloudsTexture.colorSpace = THREE.SRGBColorSpace;
+        cloudsTexture.needsUpdate = true;
+
+        dayTextureRef.current = dayTexture;
+        nightTextureRef.current = nightTexture;
+        cloudsTextureRef.current = cloudsTexture;
+
+        const globeMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            dayTexture: { value: dayTexture },
+            nightTexture: { value: nightTexture },
+            sunDirection: { value: sunDirection },
+          },
+          vertexShader: dayNightVertexShader,
+          fragmentShader: dayNightFragmentShader,
+        });
+        globeMaterialRef.current = globeMaterial;
+        globe.globeMaterial(globeMaterial);
+
+        const cloudsMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(globeRadius * 1.005, 64, 64),
+          new THREE.MeshPhongMaterial({
+            map: cloudsTexture,
+            transparent: true,
+            opacity: CLOUDS_OPACITY,
+            depthWrite: false,
+          })
+        );
+        cloudsRef.current = cloudsMesh;
+        globe.scene().add(cloudsMesh);
+
+        props.onReady?.();
       })
-    );
-    cloudsRef.current = cloudsMesh;
-    globe.scene().add(cloudsMesh);
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load globe textures', err);
+        props.onReady?.();
+      });
 
     // --- Controls ---------------------------------------------------------
     const controls = globe.controls();
+    controlsRef.current = controls;
     controls.enableZoom = false;
     controls.enablePan = false;
     controls.enableDamping = true;
     controls.autoRotate = !reducedMotionRef.current;
     controls.autoRotateSpeed = 0.35;
 
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
-    const clearIdleTimer = () => {
-      if (idleTimer !== null) {
-        clearTimeout(idleTimer);
-        idleTimer = null;
-      }
-    };
     const handleControlsStart = () => {
       clearIdleTimer();
       controls.autoRotate = false;
@@ -149,16 +246,15 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     const handleControlsEnd = () => {
       clearIdleTimer();
       if (reducedMotionRef.current) return;
-      idleTimer = setTimeout(() => {
+      // Hold position while a place is selected; only resume idle rotation
+      // once the selection is cleared.
+      if (selectionActiveRef.current) return;
+      idleTimerRef.current = setTimeout(() => {
         controls.autoRotate = true;
       }, IDLE_RESUME_MS);
     };
     controls.addEventListener('start', handleControlsStart);
     controls.addEventListener('end', handleControlsEnd);
-
-    // --- Renderer pixel ratio ------------------------------------------------
-    const renderer = globe.renderer();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     // --- Resize -----------------------------------------------------------
     const handleResize = () => {
@@ -221,34 +317,68 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         cloudsRef.current = null;
       }
 
-      dayTexture.dispose();
-      nightTexture.dispose();
-      cloudsTexture.dispose();
-      globeMaterial.dispose();
+      if (glowRef.current) {
+        globe.scene().remove(glowRef.current);
+        glowRef.current.geometry.dispose();
+        (glowRef.current.material as THREE.Material).dispose();
+        glowRef.current = null;
+      }
+
+      for (const sprite of pinSpritesRef.current.values()) {
+        (sprite.material as THREE.SpriteMaterial).dispose();
+      }
+      pinSpritesRef.current.clear();
+      pinTextureRef.current?.dispose();
+
+      dayTextureRef.current?.dispose();
+      nightTextureRef.current?.dispose();
+      cloudsTextureRef.current?.dispose();
+      globeMaterialRef.current?.dispose();
 
       globe._destructor();
       if (container) container.innerHTML = '';
       globeRef.current = null;
+      controlsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Update points data when places change --------------------------------
+  // --- Update objects data when places change --------------------------------
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
-    globe.pointsData(props.places);
+    globe.objectsData(props.places);
   }, [props.places]);
 
-  // --- Selection: rings + fly-to ---------------------------------------------
+  // --- Selection: pin scale + ring + fly-to + auto-rotate hold ----------------
   useEffect(() => {
     const globe = globeRef.current;
+    const controls = controlsRef.current;
     if (!globe) return;
 
-    const selectedId = props.selectedId;
+    const selectedId = props.selectedId ?? null;
+
+    // Reset the previously-highlighted pin (if different from the new one).
+    if (selectedPinIdRef.current && selectedPinIdRef.current !== selectedId) {
+      const prevSprite = pinSpritesRef.current.get(selectedPinIdRef.current);
+      prevSprite?.scale.set(PIN_BASE_SCALE, PIN_BASE_SCALE, 1);
+      selectedPinIdRef.current = null;
+    }
+
     if (!selectedId) {
       globe.ringsData([]);
+      selectionActiveRef.current = false;
+      if (controls && !reducedMotionRef.current) {
+        clearIdleTimer();
+        controls.autoRotate = true;
+      }
       return;
+    }
+
+    selectionActiveRef.current = true;
+    if (controls) {
+      clearIdleTimer();
+      controls.autoRotate = false;
     }
 
     const place = findPlace(selectedId);
@@ -263,7 +393,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       flyTo(centroid.lat, centroid.lng, altitude, 1800);
     }
 
-    // Only leaves get a selection ring (single-pin highlight).
+    // Only leaves get a selection ring + enlarged pin (single-pin highlight).
     const isLeaf = props.places.some((p) => p.id === selectedId);
     if (isLeaf && place.lat !== undefined && place.lng !== undefined) {
       globe.ringsData([
@@ -273,14 +403,37 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
           color: categoryColor(place.category),
         },
       ]);
+      const sprite = pinSpritesRef.current.get(selectedId);
+      sprite?.scale.set(PIN_SELECTED_SCALE, PIN_SELECTED_SCALE, 1);
+      selectedPinIdRef.current = selectedId;
     } else {
       globe.ringsData([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedId, props.places]);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return <div ref={containerRef} className="absolute inset-0 md:left-[340px]" />;
 });
+
+/** Soft circular radial-gradient texture shared by all pin sprites. */
+function createPinTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.7, 'rgba(255,255,255,1)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
 
 function categoryColor(category: Place['category']): string {
   switch (category) {
