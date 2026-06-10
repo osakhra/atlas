@@ -3,6 +3,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import * as THREE from 'three';
 import Globe, { type GlobeInstance } from 'globe.gl';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Place } from '@/lib/types';
 import { findPlace, centroidOf, altitudeForTier } from '@/lib/geo';
 import { tokens } from '@/data/tokens';
@@ -54,6 +56,8 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const controlsRef = useRef<ReturnType<GlobeInstance['controls']> | null>(null);
   const cloudsRef = useRef<THREE.Mesh | null>(null);
   const glowRef = useRef<THREE.Mesh | null>(null);
+  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
+  const outputPassRef = useRef<OutputPass | null>(null);
   const reducedMotionRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectionActiveRef = useRef(false);
@@ -269,11 +273,28 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     controls.addEventListener('start', handleControlsStart);
     controls.addEventListener('end', handleControlsEnd);
 
+    // --- Bloom postprocessing -------------------------------------------------
+    // globe.gl already drives an EffectComposer with a RenderPass; add bloom
+    // and a final output pass to it rather than building a custom pipeline.
+    const composer = globe.postProcessingComposer();
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.5, // strength
+      0.4, // radius
+      0.7 // threshold: only bright pixels (lights, limb, glint) bloom
+    );
+    composer.addPass(bloomPass);
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+    bloomPassRef.current = bloomPass;
+    outputPassRef.current = outputPass;
+
     // --- Resize -----------------------------------------------------------
     const handleResize = () => {
       if (!container) return;
       globe.width(container.clientWidth);
       globe.height(container.clientHeight);
+      bloomPass.setSize(container.clientWidth, container.clientHeight);
     };
     window.addEventListener('resize', handleResize);
 
@@ -335,6 +356,16 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         glowRef.current.geometry.dispose();
         (glowRef.current.material as THREE.Material).dispose();
         glowRef.current = null;
+      }
+
+      if (bloomPassRef.current) {
+        composer.removePass(bloomPassRef.current);
+        bloomPassRef.current.dispose();
+        bloomPassRef.current = null;
+      }
+      if (outputPassRef.current) {
+        composer.removePass(outputPassRef.current);
+        outputPassRef.current = null;
       }
 
       for (const sprite of pinSpritesRef.current.values()) {
