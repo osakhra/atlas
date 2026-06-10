@@ -16,3 +16,9 @@ export const NIGHT_SUN_OFFSET = { yaw: -0.55, pitch: 0.25 };
 // How long a day/night mode toggle takes for the terminator to sweep into
 // its new position.
 export const MODE_TRANSITION_MS = 1200;
+
+/** Default lighting mode based on the visitor's local clock: 7am-7pm is day. */
+export function defaultLightingMode(): LightingMode {
+  const hour = new Date().getHours();
+  return hour >= 7 && hour < 19 ? 'day' : 'night';
+}

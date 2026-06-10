@@ -4,12 +4,14 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import Legend from '@/components/Legend';
+import LightingToggle from '@/components/LightingToggle';
 import LocationCard from '@/components/LocationCard';
 import Preloader from '@/components/Preloader';
 import Sidebar from '@/components/Sidebar';
 import { places } from '@/data/places';
 import { flattenPlaces, findPlace } from '@/lib/geo';
 import { SelectionProvider, useSelection } from '@/lib/selection';
+import { defaultLightingMode, type LightingMode } from '@/lib/sun';
 
 const GlobeScene = dynamic(() => import('@/components/GlobeScene'), { ssr: false });
 
@@ -21,6 +23,11 @@ const flatPlaces = flattenPlaces(places);
  */
 function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void }) {
   const { selected, select } = useSelection();
+  const [lightingMode, setLightingMode] = useState<LightingMode>(defaultLightingMode());
+
+  const toggleLightingMode = () => {
+    setLightingMode((mode) => (mode === 'day' ? 'night' : 'day'));
+  };
 
   // Deep link: select a place from the URL hash on first load.
   useEffect(() => {
@@ -41,13 +48,21 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
   return (
     <>
       <div className="absolute inset-0 z-0">
-        <GlobeScene places={flatPlaces} selectedId={selected?.id ?? null} onReady={onReady} />
+        <GlobeScene
+          places={flatPlaces}
+          selectedId={selected?.id ?? null}
+          lightingMode={lightingMode}
+          onReady={onReady}
+        />
       </div>
 
       <Header />
       <Sidebar tree={places} />
       <LocationCard />
-      <Legend />
+      <div className="pointer-events-none fixed right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-4 sm:top-4">
+        <LightingToggle mode={lightingMode} onToggle={toggleLightingMode} />
+        <Legend />
+      </div>
       <Preloader visible={!ready} />
     </>
   );
