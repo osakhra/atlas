@@ -7,10 +7,13 @@
 export const dayNightVertexShader = /* glsl */ `
 varying vec2 vUv;
 varying vec3 vWorldNormal;
+varying vec3 vWorldPosition;
 
 void main() {
   vUv = uv;
   vWorldNormal = normalize(mat3(modelMatrix) * normal);
+  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
@@ -18,17 +21,30 @@ void main() {
 export const dayNightFragmentShader = /* glsl */ `
 uniform sampler2D dayTexture;
 uniform sampler2D nightTexture;
+uniform sampler2D specularMap;
 uniform vec3 sunDirection;
 
 varying vec2 vUv;
 varying vec3 vWorldNormal;
+varying vec3 vWorldPosition;
 
 void main() {
-  float cosAngle = dot(normalize(vWorldNormal), sunDirection);
+  vec3 N = normalize(vWorldNormal);
+  float cosAngle = dot(N, sunDirection);
   float blend = smoothstep(-0.08, 0.08, cosAngle);
   vec3 day = texture2D(dayTexture, vUv).rgb;
   vec3 night = texture2D(nightTexture, vUv).rgb * 2.2; // lift city lights
-  gl_FragColor = vec4(mix(night, day, blend), 1.0);
+  vec3 color = mix(night, day, blend);
+
+  // Sun glint on water: specularMap is a grayscale ocean mask (ocean
+  // light, land dark). Confined to the day side via the blend factor.
+  float ocean = texture2D(specularMap, vUv).r;
+  vec3 Vd = normalize(cameraPosition - vWorldPosition);
+  vec3 Hd = normalize(sunDirection + Vd);
+  float spec = pow(max(dot(N, Hd), 0.0), 90.0) * ocean * blend;
+  color += spec * 0.9 * vec3(1.0, 0.96, 0.88);
+
+  gl_FragColor = vec4(color, 1.0);
 }
 `;
 

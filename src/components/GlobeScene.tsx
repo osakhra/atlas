@@ -64,6 +64,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const dayTextureRef = useRef<THREE.Texture | null>(null);
   const nightTextureRef = useRef<THREE.Texture | null>(null);
   const cloudsTextureRef = useRef<THREE.Texture | null>(null);
+  const specularTextureRef = useRef<THREE.Texture | null>(null);
   const globeMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
   const pinTextureRef = useRef<THREE.CanvasTexture | null>(null);
 
@@ -183,8 +184,13 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         textureLoader.load(url, resolve, undefined, reject);
       });
 
-    Promise.all([loadTexture(dayTextureUrl), loadTexture('/textures/earth-night.jpg'), loadTexture('/textures/earth-clouds.png')])
-      .then(([dayTexture, nightTexture, cloudsTexture]) => {
+    Promise.all([
+      loadTexture(dayTextureUrl),
+      loadTexture('/textures/earth-night.jpg'),
+      loadTexture('/textures/earth-clouds.png'),
+      loadTexture('/textures/earth-specular.jpg'),
+    ])
+      .then(([dayTexture, nightTexture, cloudsTexture, specularTexture]) => {
         const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
         for (const tex of [dayTexture, nightTexture]) {
           tex.colorSpace = THREE.SRGBColorSpace;
@@ -194,14 +200,21 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         cloudsTexture.colorSpace = THREE.SRGBColorSpace;
         cloudsTexture.needsUpdate = true;
 
+        // Specular map is data (an ocean mask), not color.
+        specularTexture.colorSpace = THREE.NoColorSpace;
+        specularTexture.anisotropy = maxAnisotropy;
+        specularTexture.needsUpdate = true;
+
         dayTextureRef.current = dayTexture;
         nightTextureRef.current = nightTexture;
         cloudsTextureRef.current = cloudsTexture;
+        specularTextureRef.current = specularTexture;
 
         const globeMaterial = new THREE.ShaderMaterial({
           uniforms: {
             dayTexture: { value: dayTexture },
             nightTexture: { value: nightTexture },
+            specularMap: { value: specularTexture },
             sunDirection: { value: sunDirection },
           },
           vertexShader: dayNightVertexShader,
@@ -333,6 +346,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       dayTextureRef.current?.dispose();
       nightTextureRef.current?.dispose();
       cloudsTextureRef.current?.dispose();
+      specularTextureRef.current?.dispose();
       globeMaterialRef.current?.dispose();
 
       globe._destructor();
