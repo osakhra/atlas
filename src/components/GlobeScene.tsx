@@ -8,7 +8,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Place } from '@/lib/types';
 import { findPlace, centroidOf, altitudeForTier } from '@/lib/geo';
 import { tokens } from '@/data/tokens';
-import { SUBSOLAR_POINT } from '@/lib/sun';
+import { type LightingMode, DAY_SUN_OFFSET, NIGHT_SUN_OFFSET, MODE_TRANSITION_MS } from '@/lib/sun';
 import {
   dayNightVertexShader,
   dayNightFragmentShader,
@@ -26,6 +26,8 @@ export interface GlobeSceneProps {
   places: Place[];
   /** id of the currently selected place (leaf or branch), or null/undefined if none. */
   selectedId?: string | null;
+  /** Day or night lighting. Defaults to 'day' if omitted. */
+  lightingMode?: LightingMode;
   /** Call once after the globe textures finish loading, so the page can dismiss its Preloader. */
   onReady?: () => void;
 }
@@ -46,6 +48,10 @@ const PIN_SELECTED_SCALE = PIN_BASE_SCALE * 1.6;
 const PIN_OBJECT_ALTITUDE = 0.015;
 
 const CLOUDS_OPACITY = 0.18;
+
+// Time constant for the per-frame sun-direction lerp, derived so a mode
+// toggle reaches ~95% of its new position after MODE_TRANSITION_MS.
+const SUN_LERP_TAU = MODE_TRANSITION_MS / 1000 / 3;
 
 // Opening camera position: Earth filling most of the frame.
 const OPENING_VIEW = { lat: 20, lng: -85, altitude: 1.35 };
@@ -77,8 +83,10 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   // the rAF loop can read current values without re-subscribing.
   const placesRef = useRef<Place[]>(props.places);
   const selectedIdRef = useRef<string | null | undefined>(props.selectedId);
+  const lightingModeRef = useRef<LightingMode>(props.lightingMode ?? 'day');
   placesRef.current = props.places;
   selectedIdRef.current = props.selectedId;
+  lightingModeRef.current = props.lightingMode ?? 'day';
 
   // Imperative fly-to, also used internally for selection-driven camera moves.
   const flyTo = (lat: number, lng: number, altitude: number, durationMs = 1800) => {
@@ -151,13 +159,35 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     // (0ms) so there's no fly-in animation on first paint.
     globe.pointOfView(OPENING_VIEW, 0);
 
-    // --- Sun direction, derived from a subsolar point -----------------------
-    // globe.getCoords gives the position of that lat/lng on the globe's own
-    // (unrotated) sphere -- the same space the day/night shader's
-    // world-space normals live in, since the globe mesh itself never
-    // rotates (only the camera orbits).
-    const subsolar = globe.getCoords(SUBSOLAR_POINT.lat, SUBSOLAR_POINT.lng, 0);
-    const sunDirection = new THREE.Vector3(subsolar.x, subsolar.y, subsolar.z).normalize();
+    // --- Camera-relative sun direction ---------------------------------------
+    // Recomputed every frame (in the render loop below) from the camera's
+    // current orientation, offset by a small yaw/pitch so the terminator
+    // sits at a pleasing angle regardless of how far the globe has been
+    // rotated. These temps are reused each frame to avoid allocation.
+    const sunCamDir = new THREE.Vector3();
+    const sunRight = new THREE.Vector3();
+    const sunUp = new THREE.Vector3();
+    const sunForward = new THREE.Vector3();
+    const targetSunDirection = new THREE.Vector3();
+
+    const computeTargetSunDirection = (out: THREE.Vector3) => {
+      const camera = globe.camera();
+      sunCamDir.copy(camera.position).normalize();
+      camera.matrixWorld.extractBasis(sunRight, sunUp, sunForward);
+
+      const mode = lightingModeRef.current;
+      const offset = mode === 'day' ? DAY_SUN_OFFSET : NIGHT_SUN_OFFSET;
+      out.copy(sunCamDir);
+      if (mode === 'night') out.negate();
+      out.applyAxisAngle(sunUp, offset.yaw);
+      out.applyAxisAngle(sunRight, offset.pitch);
+      out.normalize();
+    };
+
+    // Live sun direction, lerped toward the target each frame. Shared by
+    // reference with the globeMaterial uniform once it's created below.
+    const sunDirection = new THREE.Vector3();
+    computeTargetSunDirection(sunDirection);
 
     // --- Atmospheric rim glow -------------------------------------------------
     const globeRadius = globe.getGlobeRadius();
@@ -323,6 +353,15 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       if (!reducedMotionRef.current && cloudsRef.current) {
         cloudsRef.current.rotation.y += CLOUD_ANGULAR_SPEED * delta;
       }
+
+      computeTargetSunDirection(targetSunDirection);
+      if (reducedMotionRef.current) {
+        sunDirection.copy(targetSunDirection);
+      } else {
+        const damping = 1 - Math.exp(-delta / SUN_LERP_TAU);
+        sunDirection.lerp(targetSunDirection, damping).normalize();
+      }
+
       rafId = requestAnimationFrame(animate);
     };
     rafId = requestAnimationFrame(animate);
