@@ -50,6 +50,30 @@ vec3 perturbNormal2Arb(vec3 eyePos, vec3 surfNormal, vec3 mapN) {
   return normalize(T * (mapN.x * scale) + B * (mapN.y * scale) + N * mapN.z);
 }
 
+// Specular ocean glint tuning. Shininess controls how tight the highlight
+// is; strength controls its brightness. With the camera-relative sun (the
+// sun direction is now usually close to the view direction in day mode),
+// a low shininess spreads the highlight across a large fraction of the
+// visible disc and blows out under bloom -- keep this tight.
+const float SPEC_SHININESS = 240.0;
+const float SPEC_STRENGTH = 0.45;
+
+// Color grading: midtone lift/contrast applied to the blended day/night
+// color. GRADE_GAMMA < 1 lifts shadows/midtones; GRADE_GAIN brightens
+// overall. Together these make the day side read brighter and softer than
+// the raw satellite imagery, similar to a lock-screen wallpaper grade.
+const float GRADE_GAMMA = 0.90;
+const float GRADE_GAIN = 1.06;
+
+// Limb haze: a soft bluish wash that strengthens toward the grazing edge
+// of the visible disc, blending into the outer fresnel atmosphere glow.
+// HAZE_RIM_POWER controls how tightly the haze hugs the limb (higher =
+// thinner band); HAZE_STRENGTH is its maximum opacity. Confined to the
+// day side via the blend factor so night-side city lights are untouched.
+const vec3 HAZE_COLOR = vec3(0.61, 0.76, 0.92);
+const float HAZE_RIM_POWER = 2.6;
+const float HAZE_STRENGTH = 0.38;
+
 void main() {
   vec3 surfaceNormal = normalize(vWorldNormal);
   vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
@@ -67,8 +91,17 @@ void main() {
   float ocean = texture2D(specularMap, vUv).r;
   vec3 Vd = normalize(cameraPosition - vWorldPosition);
   vec3 Hd = normalize(sunDirection + Vd);
-  float spec = pow(max(dot(N, Hd), 0.0), 90.0) * ocean * blend;
-  color += spec * 0.9 * vec3(1.0, 0.96, 0.88);
+  float spec = pow(max(dot(N, Hd), 0.0), SPEC_SHININESS) * ocean * blend;
+  color += spec * SPEC_STRENGTH * vec3(1.0, 0.96, 0.88);
+
+  // Midtone lift/contrast (day side reads brighter and softer than raw
+  // satellite imagery; night side city lights pass through unchanged
+  // because they are already handled above via the night/day mix).
+  color = pow(color, vec3(GRADE_GAMMA)) * GRADE_GAIN;
+
+  // Limb haze, blended in toward the grazing edge of the day side.
+  float rimHaze = pow(1.0 - max(dot(Vd, N), 0.0), HAZE_RIM_POWER);
+  color = mix(color, HAZE_COLOR, rimHaze * HAZE_STRENGTH * blend);
 
   gl_FragColor = vec4(color, 1.0);
 }
