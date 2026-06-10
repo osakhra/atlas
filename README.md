@@ -38,9 +38,11 @@ Self-hosted in `public/textures/`, all derived from public-domain NASA
 imagery (no attribution required, credited here for reference):
 
 - `earth-day-8k.jpg` / `earth-day-4k.jpg`: NASA Visible Earth, Blue Marble
-  Next Generation (`world.topo.bathy.200412.3x21600x10800.jpg`), downscaled
-  to 8192x4096 and 4096x2048 (q85). The globe picks the 8K texture when
-  `renderer.capabilities.maxTextureSize >= 8192`, else the 4K fallback.
+  Next Generation (`world.topo.bathy.200407.3x21600x10800.jpg`, the July
+  composite so the northern hemisphere shows summer vegetation rather than
+  snow cover), downscaled to 8192x4096 and 4096x2048 (q85). The globe picks
+  the 8K texture when `renderer.capabilities.maxTextureSize >= 8192`, else
+  the 4K fallback.
 - `earth-night.jpg`: NASA Earth Observatory, Black Marble 2016
   (`BlackMarble_2016_3km.jpg`), downscaled to 8192x4096.
 - `earth-clouds.png`: NASA MODIS cloud composite (4096x2048, alpha channel),
