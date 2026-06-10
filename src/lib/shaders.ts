@@ -22,14 +22,40 @@ export const dayNightFragmentShader = /* glsl */ `
 uniform sampler2D dayTexture;
 uniform sampler2D nightTexture;
 uniform sampler2D specularMap;
+uniform sampler2D normalMap;
 uniform vec3 sunDirection;
 
 varying vec2 vUv;
 varying vec3 vWorldNormal;
 varying vec3 vWorldPosition;
 
+// Derivative-based tangent frame (Schuler's perturbNormal2Arb), so a normal
+// map can be applied without precomputed tangent attributes.
+vec3 perturbNormal2Arb(vec3 eyePos, vec3 surfNormal, vec3 mapN) {
+  vec3 q0 = dFdx(eyePos);
+  vec3 q1 = dFdy(eyePos);
+  vec2 st0 = dFdx(vUv);
+  vec2 st1 = dFdy(vUv);
+
+  vec3 N = surfNormal;
+  vec3 q1perp = cross(q1, N);
+  vec3 q0perp = cross(N, q0);
+
+  vec3 T = q1perp * st0.x + q0perp * st1.x;
+  vec3 B = q1perp * st0.y + q0perp * st1.y;
+
+  float det = max(dot(T, T), dot(B, B));
+  float scale = (det == 0.0) ? 0.0 : inversesqrt(det);
+
+  return normalize(T * (mapN.x * scale) + B * (mapN.y * scale) + N * mapN.z);
+}
+
 void main() {
-  vec3 N = normalize(vWorldNormal);
+  vec3 surfaceNormal = normalize(vWorldNormal);
+  vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
+  mapN.xy *= 0.5; // subtle relief
+  vec3 N = perturbNormal2Arb(vWorldPosition, surfaceNormal, mapN);
+
   float cosAngle = dot(N, sunDirection);
   float blend = smoothstep(-0.08, 0.08, cosAngle);
   vec3 day = texture2D(dayTexture, vUv).rgb;

@@ -45,6 +45,11 @@ imagery (no attribution required, credited here for reference):
   (`BlackMarble_2016_3km.jpg`), downscaled to 8192x4096.
 - `earth-clouds.png`: NASA MODIS cloud composite (4096x2048, alpha channel),
   via the public-domain `webgl-earth` texture set.
+- `earth-specular.jpg` / `earth-normal.jpg`: Solar System Scope `8k_earth_specular_map`
+  and `8k_earth_normal_map` (CC BY 4.0, https://www.solarsystemscope.com/textures/),
+  downscaled to 4096x2048. Used as data textures (ocean mask and terrain
+  relief), loaded with `THREE.NoColorSpace`. Attribution: "2K Earth textures
+  by Solar System Scope, https://www.solarsystemscope.com/textures/, CC BY 4.0."
 - `night-sky.png`: starfield background (see Phase 0).
 
 ## Build / static export
