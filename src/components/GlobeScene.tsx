@@ -255,6 +255,8 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
             nightTexture: { value: nightTexture },
             specularMap: { value: specularTexture },
             normalMap: { value: normalTexture },
+            cloudTexture: { value: cloudsTexture },
+            cloudOffset: { value: 0 },
             sunDirection: { value: sunDirection },
           },
           vertexShader: dayNightVertexShader,
@@ -352,6 +354,9 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       lastTime = time;
       if (!reducedMotionRef.current && cloudsRef.current) {
         cloudsRef.current.rotation.y += CLOUD_ANGULAR_SPEED * delta;
+      }
+      if (cloudsRef.current && globeMaterialRef.current) {
+        globeMaterialRef.current.uniforms.cloudOffset.value = cloudsRef.current.rotation.y / (2 * Math.PI);
       }
 
       computeTargetSunDirection(targetSunDirection);

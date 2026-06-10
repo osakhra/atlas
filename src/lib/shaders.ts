@@ -23,6 +23,8 @@ uniform sampler2D dayTexture;
 uniform sampler2D nightTexture;
 uniform sampler2D specularMap;
 uniform sampler2D normalMap;
+uniform sampler2D cloudTexture;
+uniform float cloudOffset;
 uniform vec3 sunDirection;
 
 varying vec2 vUv;
@@ -74,6 +76,12 @@ const vec3 HAZE_COLOR = vec3(0.61, 0.76, 0.92);
 const float HAZE_RIM_POWER = 2.6;
 const float HAZE_STRENGTH = 0.38;
 
+// Cloud drop shadow: darken the day-side surface under clouds, sampling
+// the cloud texture at its current rotation offset (cloudOffset = cloud
+// mesh's Y rotation in turns). No shadow mapping involved. Confined to the
+// day side via the blend factor.
+const float CLOUD_SHADOW_STRENGTH = 0.22;
+
 void main() {
   vec3 surfaceNormal = normalize(vWorldNormal);
   vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
@@ -93,6 +101,10 @@ void main() {
   vec3 Hd = normalize(sunDirection + Vd);
   float spec = pow(max(dot(N, Hd), 0.0), SPEC_SHININESS) * ocean * blend;
   color += spec * SPEC_STRENGTH * vec3(1.0, 0.96, 0.88);
+
+  // Cloud drop shadow on the day side.
+  float cloudShadow = texture2D(cloudTexture, vec2(fract(vUv.x - cloudOffset), vUv.y)).a;
+  color *= 1.0 - cloudShadow * CLOUD_SHADOW_STRENGTH * blend;
 
   // Midtone lift/contrast (day side reads brighter and softer than raw
   // satellite imagery; night side city lights pass through unchanged
