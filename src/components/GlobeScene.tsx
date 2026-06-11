@@ -42,10 +42,15 @@ const IDLE_RESUME_MS = 8000;
 const GLOW_SCALE = 1.22;
 const GLOW_COLOR = new THREE.Color(0.62, 0.82, 1.0);
 
-// Pin sprite scale (world units). Selected pins scale up by 1.6x.
-const PIN_BASE_SCALE = 2.5;
-const PIN_SELECTED_SCALE = PIN_BASE_SCALE * 1.6;
-const PIN_OBJECT_ALTITUDE = 0.015;
+// Pin sprite scale. sizeAttenuation is off, so pins hold a constant screen
+// size at every zoom level; selected pins scale up. With a non-attenuated
+// three.js sprite the scale is in clip-space units (not pixels), so these
+// values are tuned to land at roughly 28 px and 38 px tall on screen.
+const PIN_BASE_SCALE = 0.03;
+const PIN_SELECTED_SCALE = 0.04;
+// Tip-anchored sprites (center y = 0) hang upward from the location, so the
+// body never intersects the surface; a tiny altitude keeps the tip on it.
+const PIN_OBJECT_ALTITUDE = 0.005;
 
 const CLOUDS_OPACITY = 0.18;
 
@@ -68,6 +73,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectionActiveRef = useRef(false);
   const pinSpritesRef = useRef<Map<string, THREE.Sprite>>(new Map());
+  const pinTexturesRef = useRef<Map<string, THREE.CanvasTexture>>(new Map());
   const selectedPinIdRef = useRef<string | null>(null);
 
   // Disposable resources populated once textures finish loading.
@@ -77,7 +83,6 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const specularTextureRef = useRef<THREE.Texture | null>(null);
   const normalTextureRef = useRef<THREE.Texture | null>(null);
   const globeMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
-  const pinTextureRef = useRef<THREE.CanvasTexture | null>(null);
 
   // Latest props mirrored into refs so the init effect (which runs once) and
   // the rAF loop can read current values without re-subscribing.
@@ -113,20 +118,28 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     reducedMotionRef.current = reducedMotionQuery.matches;
 
-    // --- Pin sprite texture (shared, soft circular gradient) ----------------
-    const pinTexture = createPinTexture();
-    pinTextureRef.current = pinTexture;
+    // --- Pin sprite textures (one teardrop per category, cached) ------------
+    // Four textures are built once and shared across all pins; never one
+    // texture per pin (that would leak 34 canvases).
+    const pinCategories = ['lived', 'vacationed', 'work', 'planned'] as const;
+    const pinTextures = new Map<string, THREE.CanvasTexture>();
+    for (const cat of pinCategories) {
+      pinTextures.set(cat, createPinTexture(categoryColor(cat)));
+    }
+    pinTexturesRef.current = pinTextures;
 
     const makePin = (place: Place): THREE.Sprite => {
+      const texture = pinTextures.get(place.category ?? 'planned') ?? pinTextures.get('planned')!;
       const material = new THREE.SpriteMaterial({
-        map: pinTexture,
-        color: categoryColor(place.category),
+        map: texture,
         depthTest: true,
         depthWrite: false,
-        sizeAttenuation: true,
+        sizeAttenuation: false,
         transparent: true,
       });
       const sprite = new THREE.Sprite(material);
+      // Anchor the teardrop tip on the location; the body hangs upward.
+      sprite.center.set(0.5, 0.0);
       const isSelected = place.id === selectedIdRef.current;
       const scale = isSelected ? PIN_SELECTED_SCALE : PIN_BASE_SCALE;
       sprite.scale.set(scale, scale, 1);
@@ -422,7 +435,8 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         (sprite.material as THREE.SpriteMaterial).dispose();
       }
       pinSpritesRef.current.clear();
-      pinTextureRef.current?.dispose();
+      for (const tex of pinTexturesRef.current.values()) tex.dispose();
+      pinTexturesRef.current.clear();
 
       dayTextureRef.current?.dispose();
       nightTextureRef.current?.dispose();
@@ -527,20 +541,71 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   return <div ref={containerRef} className="absolute inset-0 md:left-[340px]" />;
 });
 
-/** Soft circular radial-gradient texture shared by all pin sprites. */
-function createPinTexture(): THREE.CanvasTexture {
-  const size = 64;
+/**
+ * Draws a classic teardrop map pin in the given category color: a round
+ * head tapering to a point at the bottom, a dark outline so it stays legible
+ * over snow and ocean alike, a white inner dot, and a soft ground shadow
+ * beneath the tip to sell contact with the surface. 128px canvas for crisp
+ * edges on high-DPI displays. The tip sits near the lower-middle of the
+ * canvas so a tip-anchored sprite (center y = 0) lands it on the location.
+ */
+function createPinTexture(color: string): THREE.CanvasTexture {
+  const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.7, 'rgba(255,255,255,1)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, size, size);
+    const cx = 64;
+    const cy = 46;
+    const r = 38;
+    const tipY = 112;
+    const s = Math.SQRT1_2; // sin/cos 45 deg, the circle/tail tangent points
+
+    // Ground shadow beneath the tip (drawn first, so it sits behind the pin).
+    ctx.save();
+    ctx.translate(cx, 118);
+    ctx.scale(15, 5); // unit circle -> 30x10 ellipse
+    const shadow = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    shadow.addColorStop(0, 'rgba(0,0,0,0.35)');
+    shadow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Teardrop silhouette: tip -> up the right tail -> over the top of the
+    // head -> down the left tail -> back to the tip.
+    const pin = new Path2D();
+    pin.moveTo(cx, tipY);
+    pin.quadraticCurveTo(cx + r * 0.88, cy + r * 0.95, cx + r * s, cy + r * s);
+    pin.arc(cx, cy, r, Math.PI / 4, (Math.PI * 3) / 4, true);
+    pin.quadraticCurveTo(cx - r * 0.88, cy + r * 0.95, cx, tipY);
+    pin.closePath();
+
+    // Solid category fill.
+    ctx.fillStyle = color;
+    ctx.fill(pin);
+
+    // Subtle bottom-half darkening so the pin reads as an object, not a sticker.
+    const shade = ctx.createLinearGradient(0, cy, 0, tipY);
+    shade.addColorStop(0, 'rgba(0,0,0,0)');
+    shade.addColorStop(1, 'rgba(0,0,0,0.18)');
+    ctx.fillStyle = shade;
+    ctx.fill(pin);
+
+    // Dark outline around the full silhouette (legibility over any surface).
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(8,11,18,0.92)';
+    ctx.stroke(pin);
+
+    // White inner dot.
+    ctx.beginPath();
+    ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
