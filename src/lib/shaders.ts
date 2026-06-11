@@ -146,11 +146,12 @@ void main() {
   float luma = dot(color, vec3(0.299, 0.587, 0.114));
   color = mix(vec3(luma), color, 1.0 + SAT_BOOST * blend);
 
-  // Atmosphere edge: bluish wash toward the limb (both sides), plus a
-  // brighter additive rim on the day side that bloom fuses with the halo.
+  // Atmosphere edge: bluish wash toward the limb, plus a brighter additive
+  // rim that bloom fuses with the halo. Both gated to the day side -- the
+  // night-side limb has no sunlight to scatter, so it stays dark.
   float rimEdge = pow(1.0 - max(dot(Vd, N), 0.0), HAZE_RIM_POWER);
   vec3 atmTint = mix(HAZE_COLOR, vec3(0.85, 0.93, 1.0), rimEdge);
-  color = mix(color, atmTint, rimEdge * HAZE_STRENGTH);
+  color = mix(color, atmTint, rimEdge * HAZE_STRENGTH * blend);
   color += vec3(0.75, 0.88, 1.0) * pow(rimEdge, 3.5) * RIM_BRIGHT * blend;
 
   gl_FragColor = vec4(color, 1.0);
