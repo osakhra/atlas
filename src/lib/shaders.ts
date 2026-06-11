@@ -86,6 +86,13 @@ const float RIM_BRIGHT = 0.55;
 // day side via the blend factor.
 const float CLOUD_SHADOW_STRENGTH = 0.22;
 
+// Night side: the night texture's dark land carries an earthshine wash
+// (purple-grey ~rgb(37,33,60), not black). Separating the bright city
+// lights from that base lets the lights stay gold while the land crushes
+// toward black, rather than the whole hemisphere greying out.
+const float NIGHT_LIGHT_GAIN = 3.0;
+const float NIGHT_BASE_GAIN = 0.35;
+
 void main() {
   vec3 surfaceNormal = normalize(vWorldNormal);
   vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
@@ -94,8 +101,14 @@ void main() {
 
   float cosAngle = dot(N, sunDirection);
   float blend = smoothstep(-0.08, 0.08, cosAngle);
+  vec3 nightTex = texture2D(nightTexture, vUv).rgb;
+  // Isolate warm, bright city lights from the dark earthshine base, then
+  // brighten the lights and crush the base toward black.
+  float lightMask = smoothstep(0.06, 0.20, max(nightTex.r, nightTex.g));
+  vec3 cityLights = nightTex * lightMask * NIGHT_LIGHT_GAIN;
+  vec3 nightBase = nightTex * (1.0 - lightMask) * NIGHT_BASE_GAIN;
+  vec3 night = cityLights + nightBase;
   vec3 day = texture2D(dayTexture, vUv).rgb;
-  vec3 night = texture2D(nightTexture, vUv).rgb * 2.2; // lift city lights
   vec3 color = mix(night, day, blend);
 
   // Sun glint on water: specularMap is a grayscale ocean mask (ocean
