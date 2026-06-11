@@ -93,6 +93,13 @@ const float CLOUD_SHADOW_STRENGTH = 0.22;
 const float NIGHT_LIGHT_GAIN = 3.0;
 const float NIGHT_BASE_GAIN = 0.35;
 
+// Warm sunset band sitting on the terminator (the day/night line). It peaks
+// where cosAngle is near zero and must stay a thin band, not bleed across
+// the disc.
+const float TERM_WIDTH = 0.18;
+const float TERM_STRENGTH = 0.5;
+const vec3 TERM_COLOR = vec3(1.0, 0.55, 0.30);
+
 void main() {
   vec3 surfaceNormal = normalize(vWorldNormal);
   vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
@@ -122,6 +129,10 @@ void main() {
   // Cloud drop shadow on the day side.
   float cloudShadow = texture2D(cloudTexture, vec2(fract(vUv.x - cloudOffset), vUv.y)).a;
   color *= 1.0 - cloudShadow * CLOUD_SHADOW_STRENGTH * blend;
+
+  // Warm sunset band on the terminator: peaks where cosAngle is near zero.
+  float term = 1.0 - smoothstep(0.0, TERM_WIDTH, abs(cosAngle));
+  color = mix(color, color * TERM_COLOR + TERM_COLOR * 0.15, term * TERM_STRENGTH);
 
   // Midtone lift/contrast on the day side only. Weighting by blend keeps the
   // grade from lifting (and greying) the crushed night side.
