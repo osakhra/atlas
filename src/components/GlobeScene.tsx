@@ -64,7 +64,7 @@ const BLOOM_NIGHT_STRENGTH = 0.4;
 // Procedural starfield: point count and base sprite size. Stars live on a
 // thick shell far outside the globe; sizeAttenuation shrinks distant points,
 // so the base size is tuned up to keep them crisp and visible.
-const STAR_COUNT = 2400;
+const STAR_COUNT = 4500;
 const STAR_BASE_SIZE = 6;
 
 // Time constant for the per-frame sun-direction lerp, derived so a mode
@@ -742,23 +742,30 @@ function createStarfield(): THREE.Points {
       bb = 0.8;
     }
 
-    // Brightness tier: ~70% dim, ~24% mid, ~6% bright. Fold brightness into
-    // color so dim stars sink toward black under additive blending.
+    // Brightness tier: ~55% dim, ~33% mid, ~12% bright. Fold brightness into
+    // color so dim stars sink toward black under additive blending. Within
+    // the bright tier, the top ~2% overall are hero stars: a few standout
+    // points get an extra size boost below.
     const tier = rand();
     let brightness: number;
-    if (tier < 0.7) {
-      brightness = 0.25 + rand() * 0.25; // dim
-    } else if (tier < 0.94) {
-      brightness = 0.5 + rand() * 0.3; // mid
+    let isHero = false;
+    if (tier < 0.55) {
+      brightness = 0.3 + rand() * 0.25; // dim
+    } else if (tier < 0.88) {
+      brightness = 0.55 + rand() * 0.3; // mid
     } else {
-      brightness = 0.8 + rand() * 0.2; // bright
+      brightness = 0.85 + rand() * 0.15; // bright
+      isHero = tier > 0.98; // top ~2% of all stars
     }
     colors[i * 3] = br * brightness;
     colors[i * 3 + 1] = bg * brightness;
     colors[i * 3 + 2] = bb * brightness;
 
-    // Size also scales with brightness, so dim stars are small specks.
-    sizes[i] = (1.4 + rand() * 1.4) * brightness;
+    // Size also scales with brightness, so dim stars are small specks. Hero
+    // stars get an extra boost so a handful of points stand out clearly.
+    let size = (1.4 + rand() * 1.4) * brightness;
+    if (isHero) size *= 1.6;
+    sizes[i] = size;
   }
 
   const geometry = new THREE.BufferGeometry();
