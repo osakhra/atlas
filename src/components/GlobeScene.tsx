@@ -57,8 +57,8 @@ const PIN_OBJECT_ALTITUDE = 0.005;
 
 // Bloom strength per lighting mode, before per-frame zoom scaling (see the
 // rAF loop). Threshold stays mode-based and is set in the mode effect.
-const BLOOM_DAY_STRENGTH = 0.3;
-const BLOOM_NIGHT_STRENGTH = 0.5;
+const BLOOM_DAY_STRENGTH = 0.18;
+const BLOOM_NIGHT_STRENGTH = 0.4;
 
 // Procedural starfield: point count and base sprite size. Stars live on a
 // thick shell far outside the globe; sizeAttenuation shrinks distant points,
@@ -355,9 +355,9 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     const composer = globe.postProcessingComposer();
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(container.clientWidth, container.clientHeight),
-      0.5, // strength
-      0.4, // radius
-      0.7 // threshold: only bright pixels (lights, limb, glint) bloom
+      0.35, // strength (per-frame mode + zoom scaled below)
+      0.3, // radius
+      0.85 // threshold: only genuinely bright pixels (lights, tight glint) bloom
     );
     composer.addPass(bloomPass);
     const outputPass = new OutputPass();
