@@ -7,10 +7,11 @@
 export type LightingMode = 'day' | 'night';
 
 // Angular offsets (radians) applied to the camera direction to place the
-// sun. Day: sun behind the viewer's upper-left shoulder -> full lit disc
-// with gentle falloff toward the lower-right limb. Night: sun behind the
-// globe, offset so a thin dawn sliver lights the upper-left limb.
-export const DAY_SUN_OFFSET = { yaw: -0.35, pitch: 0.30 };
+// sun. Day: a small yaw/pitch keeps the specular hotspot mid-disc rather
+// than riding up onto the bright polar cap (which blew out under bloom).
+// Night: sun behind the globe, offset so a thin dawn sliver lights the
+// upper-left limb.
+export const DAY_SUN_OFFSET = { yaw: -0.35, pitch: 0.12 };
 export const NIGHT_SUN_OFFSET = { yaw: -0.55, pitch: 0.25 };
 
 // How long a day/night mode toggle takes for the terminator to sweep into

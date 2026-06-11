@@ -508,6 +508,22 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedId, props.places]);
 
+  // --- Mode-aware bloom -------------------------------------------------------
+  // Day mode raises the bloom threshold and drops its strength so the bright
+  // summer day texture (snow caps, deserts) does not wash into a featureless
+  // glow; night mode lowers the threshold so city lights and the limb bloom.
+  useEffect(() => {
+    const bloom = bloomPassRef.current;
+    if (!bloom) return;
+    if ((props.lightingMode ?? 'day') === 'day') {
+      bloom.threshold = 0.85;
+      bloom.strength = 0.3;
+    } else {
+      bloom.threshold = 0.7;
+      bloom.strength = 0.5;
+    }
+  }, [props.lightingMode]);
+
   return <div ref={containerRef} className="absolute inset-0 md:left-[340px]" />;
 });
 
