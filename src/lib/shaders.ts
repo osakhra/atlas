@@ -67,14 +67,18 @@ const float SPEC_STRENGTH = 0.45;
 const float GRADE_GAMMA = 0.90;
 const float GRADE_GAIN = 1.06;
 
-// Limb haze: a soft bluish wash that strengthens toward the grazing edge
-// of the visible disc, blending into the outer fresnel atmosphere glow.
-// HAZE_RIM_POWER controls how tightly the haze hugs the limb (higher =
-// thinner band); HAZE_STRENGTH is its maximum opacity. Confined to the
-// day side via the blend factor so night-side city lights are untouched.
+// In-disc atmosphere edge: a bluish wash that strengthens toward the
+// grazing limb of the visible disc, plus a brighter additive rim that
+// bloom fuses with the outer halo into a single glowing edge. The base
+// haze mix runs on both day and night sides (a faint blue edge on the
+// night side reads as a dawn rim); only the bright additive term is gated
+// to the day side so night city lights stay clean. HAZE_RIM_POWER controls
+// how tightly the band hugs the limb; HAZE_STRENGTH its opacity; RIM_BRIGHT
+// the strength of the additive edge highlight.
 const vec3 HAZE_COLOR = vec3(0.61, 0.76, 0.92);
-const float HAZE_RIM_POWER = 2.6;
-const float HAZE_STRENGTH = 0.38;
+const float HAZE_RIM_POWER = 2.2;
+const float HAZE_STRENGTH = 0.42;
+const float RIM_BRIGHT = 0.55;
 
 // Cloud drop shadow: darken the day-side surface under clouds, sampling
 // the cloud texture at its current rotation offset (cloudOffset = cloud
@@ -111,9 +115,12 @@ void main() {
   // because they are already handled above via the night/day mix).
   color = pow(color, vec3(GRADE_GAMMA)) * GRADE_GAIN;
 
-  // Limb haze, blended in toward the grazing edge of the day side.
-  float rimHaze = pow(1.0 - max(dot(Vd, N), 0.0), HAZE_RIM_POWER);
-  color = mix(color, HAZE_COLOR, rimHaze * HAZE_STRENGTH * blend);
+  // Atmosphere edge: bluish wash toward the limb (both sides), plus a
+  // brighter additive rim on the day side that bloom fuses with the halo.
+  float rimEdge = pow(1.0 - max(dot(Vd, N), 0.0), HAZE_RIM_POWER);
+  vec3 atmTint = mix(HAZE_COLOR, vec3(0.85, 0.93, 1.0), rimEdge);
+  color = mix(color, atmTint, rimEdge * HAZE_STRENGTH);
+  color += vec3(0.75, 0.88, 1.0) * pow(rimEdge, 3.5) * RIM_BRIGHT * blend;
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -142,9 +149,18 @@ uniform vec3 glowColor;
 varying vec3 vWorldNormal;
 varying vec3 vWorldPosition;
 
+// Outer halo falloff. On a BackSide sphere the visible fragments are the
+// far shell, so -dot(viewDir, normal) is largest where the line of sight
+// passes nearest the planet limb and falls to zero at the halo's outer
+// silhouette. The glow is therefore brightest exactly at the planet edge
+// and decays smoothly outward, with no dark gap and no detached ring.
+const float GLOW_FALLOFF = 2.2;
+const float GLOW_INTENSITY = 2.6;
+
 void main() {
   vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-  float rim = pow(0.62 + dot(viewDir, vWorldNormal), 3.2);
-  gl_FragColor = vec4(glowColor, 1.0) * rim;
+  float rim = pow(max(-dot(viewDir, vWorldNormal), 0.0), GLOW_FALLOFF);
+  float a = rim * GLOW_INTENSITY;
+  gl_FragColor = vec4(glowColor * a, a);
 }
 `;

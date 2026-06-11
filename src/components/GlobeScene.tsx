@@ -36,11 +36,11 @@ const CLOUD_REVOLUTION_SECONDS = 40 * 60;
 const CLOUD_ANGULAR_SPEED = (2 * Math.PI) / CLOUD_REVOLUTION_SECONDS; // rad/sec
 const IDLE_RESUME_MS = 8000;
 
-// Outer fresnel glow sphere, relative to the globe radius (100). Must stay
-// below 100 * (1 + minimum camera altitude) -- poi tier altitude is 0.24, so
-// the hard ceiling is 124. Keep this <= 1.18.
-const GLOW_SCALE = 1.12;
-const GLOW_COLOR = new THREE.Color(0.4, 0.66, 1.0);
+// Outer atmosphere halo sphere, relative to the globe radius (100). Must
+// stay below 100 * (1 + minimum camera altitude) -- poi tier altitude is
+// 0.24, so the hard ceiling is 124. 122 < 124 holds.
+const GLOW_SCALE = 1.22;
+const GLOW_COLOR = new THREE.Color(0.62, 0.82, 1.0);
 
 // Pin sprite scale (world units). Selected pins scale up by 1.6x.
 const PIN_BASE_SCALE = 2.5;
