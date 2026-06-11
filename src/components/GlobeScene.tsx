@@ -49,8 +49,8 @@ const GLOW_COLOR = new THREE.Color(0.45, 0.7, 1.0);
 // size at every zoom level; selected pins scale up. With a non-attenuated
 // three.js sprite the scale is in clip-space units (not pixels), so these
 // values are tuned to land at roughly 28 px and 38 px tall on screen.
-const PIN_BASE_SCALE = 0.03;
-const PIN_SELECTED_SCALE = 0.04;
+const PIN_BASE_SCALE = 0.024;
+const PIN_SELECTED_SCALE = 0.032;
 // Tip-anchored sprites (center y = 0) hang upward from the location, so the
 // body never intersects the surface; a tiny altitude keeps the tip on it.
 const PIN_OBJECT_ALTITUDE = 0.005;
@@ -631,9 +631,11 @@ function createPinTexture(color: string): THREE.CanvasTexture {
     pin.quadraticCurveTo(cx - r * 0.88, cy + r * 0.95, cx, tipY);
     pin.closePath();
 
-    // Solid category fill.
+    // Category fill, slightly translucent so terrain reads faintly through.
+    ctx.globalAlpha = 0.9;
     ctx.fillStyle = color;
     ctx.fill(pin);
+    ctx.globalAlpha = 1;
 
     // Subtle bottom-half darkening so the pin reads as an object, not a sticker.
     const shade = ctx.createLinearGradient(0, cy, 0, tipY);
