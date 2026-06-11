@@ -183,10 +183,11 @@ varying vec3 vWorldPosition;
 // Outer halo falloff. On a BackSide sphere the visible fragments are the
 // far shell, so -dot(viewDir, normal) is largest where the line of sight
 // passes nearest the planet limb and falls to zero at the halo's outer
-// silhouette. The glow is therefore brightest exactly at the planet edge
-// and decays smoothly outward, with no dark gap and no detached ring.
-const float GLOW_FALLOFF = 2.2;
-const float GLOW_INTENSITY = 2.6;
+// silhouette. A high exponent concentrates the brightness into a thin band
+// right at the limb (fading to black within ~10% of the radius); the modest
+// intensity keeps it from blooming into a broad glow across the frame.
+const float GLOW_FALLOFF = 5.0;
+const float GLOW_INTENSITY = 1.6;
 
 void main() {
   vec3 viewDir = normalize(cameraPosition - vWorldPosition);

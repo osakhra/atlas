@@ -39,10 +39,11 @@ const CLOUD_ANGULAR_SPEED = (2 * Math.PI) / CLOUD_REVOLUTION_SECONDS; // rad/sec
 const IDLE_RESUME_MS = 8000;
 
 // Outer atmosphere halo sphere, relative to the globe radius (100). Must
-// stay below 100 * (1 + minimum camera altitude) -- poi tier altitude is
-// 0.24, so the hard ceiling is 124. 122 < 124 holds.
-const GLOW_SCALE = 1.22;
-const GLOW_COLOR = new THREE.Color(0.62, 0.82, 1.0);
+// stay below 100 * (1 + minimum camera altitude) -- the closest tier (poi)
+// is 0.85, so the ceiling is 185. A slim 1.10 keeps the halo hugging the
+// limb instead of reaching far into space.
+const GLOW_SCALE = 1.1;
+const GLOW_COLOR = new THREE.Color(0.45, 0.7, 1.0);
 
 // Pin sprite scale. sizeAttenuation is off, so pins hold a constant screen
 // size at every zoom level; selected pins scale up. With a non-attenuated
