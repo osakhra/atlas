@@ -186,12 +186,20 @@ varying vec3 vWorldPosition;
 // silhouette. A high exponent concentrates the brightness into a thin band
 // right at the limb (fading to black within ~10% of the radius); the modest
 // intensity keeps it from blooming into a broad glow across the frame.
-const float GLOW_FALLOFF = 5.0;
+const float GLOW_FALLOFF = 6.0;
 const float GLOW_INTENSITY = 1.6;
+
+// Hard floor on the rim falloff: the raw pow() curve never reaches exactly
+// zero, so with AdditiveBlending over a full sphere that faint long tail
+// tints the entire background blue (reads as navy over black). Clipping
+// everything below GLOW_CUTOFF to zero confines the glow to the bright band
+// at the limb and lets the surrounding space stay pure black.
+const float GLOW_CUTOFF = 0.15;
 
 void main() {
   vec3 viewDir = normalize(cameraPosition - vWorldPosition);
   float rim = pow(max(-dot(viewDir, vWorldNormal), 0.0), GLOW_FALLOFF);
+  rim = smoothstep(GLOW_CUTOFF, 1.0, rim);
   float a = rim * GLOW_INTENSITY;
   gl_FragColor = vec4(glowColor * a, a);
 }
