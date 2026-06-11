@@ -14,6 +14,8 @@ import {
   dayNightFragmentShader,
   atmosphereGlowVertexShader,
   atmosphereGlowFragmentShader,
+  cloudVertexShader,
+  cloudFragmentShader,
 } from '@/lib/shaders';
 
 export interface GlobeSceneHandle {
@@ -51,8 +53,6 @@ const PIN_SELECTED_SCALE = 0.04;
 // Tip-anchored sprites (center y = 0) hang upward from the location, so the
 // body never intersects the surface; a tiny altitude keeps the tip on it.
 const PIN_OBJECT_ALTITUDE = 0.005;
-
-const CLOUDS_OPACITY = 0.18;
 
 // Procedural starfield: point count and base sprite size. Stars live on a
 // thick shell far outside the globe; sizeAttenuation shrinks distant points,
@@ -289,14 +289,22 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         globeMaterialRef.current = globeMaterial;
         globe.globeMaterial(globeMaterial);
 
+        const cloudsMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            cloudTexture: { value: cloudsTexture },
+            // Same live Vector3 the surface shader uses, so the lit side of
+            // the clouds tracks the same sun every frame.
+            sunDirection: { value: sunDirection },
+          },
+          vertexShader: cloudVertexShader,
+          fragmentShader: cloudFragmentShader,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.NormalBlending,
+        });
         const cloudsMesh = new THREE.Mesh(
           new THREE.SphereGeometry(globeRadius * 1.005, 64, 64),
-          new THREE.MeshPhongMaterial({
-            map: cloudsTexture,
-            transparent: true,
-            opacity: CLOUDS_OPACITY,
-            depthWrite: false,
-          })
+          cloudsMaterial
         );
         cloudsRef.current = cloudsMesh;
         globe.scene().add(cloudsMesh);

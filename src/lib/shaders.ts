@@ -188,3 +188,41 @@ void main() {
   gl_FragColor = vec4(glowColor * a, a);
 }
 `;
+
+/**
+ * Cloud shell shader. Clouds read as bright white where the sun hits them and
+ * fade out across the terminator so they are essentially gone on the night
+ * side (no grey veil over the city lights). Shares the surface shader's live
+ * sunDirection so the lit side tracks the same sun.
+ */
+export const cloudVertexShader = /* glsl */ `
+varying vec2 vUv;
+varying vec3 vWorldNormal;
+
+void main() {
+  vUv = uv;
+  vWorldNormal = normalize(mat3(modelMatrix) * normal);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+export const cloudFragmentShader = /* glsl */ `
+uniform sampler2D cloudTexture;
+uniform vec3 sunDirection;
+
+varying vec2 vUv;
+varying vec3 vWorldNormal;
+
+const float CLOUD_OPACITY = 0.9;
+
+void main() {
+  float a = texture2D(cloudTexture, vUv).a;
+  vec3 N = normalize(vWorldNormal);
+  float sun = dot(N, sunDirection);
+  float lit = max(sun, 0.0);
+  // Fade clouds out across the terminator so the night side is clear.
+  float dayFade = smoothstep(-0.1, 0.25, sun);
+  vec3 cloudCol = vec3(1.0) * (0.35 + 0.65 * lit);
+  gl_FragColor = vec4(cloudCol, a * dayFade * CLOUD_OPACITY);
+}
+`;
