@@ -239,6 +239,10 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     // --- Day/night shader material + cloud layer, once textures load --------
     const renderer = globe.renderer();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Pure-black (OLED) space void. The full-bleed canvas covers the
+    // viewport, so this is what reads as "space"; the brand --bg-primary
+    // token stays as-is behind the glass UI.
+    renderer.setClearColor(0x000000, 1);
 
     const maxTextureSize = renderer.capabilities.maxTextureSize;
     const dayTextureUrl = maxTextureSize >= 8192 ? '/textures/earth-day-8k.jpg' : '/textures/earth-day-4k.jpg';
@@ -689,9 +693,11 @@ function createStarTexture(): THREE.CanvasTexture {
 /**
  * Builds the static starfield: STAR_COUNT points scattered on a thick shell
  * (radius 1800-2400) with a seeded PRNG so the sky is identical across loads.
- * Most stars are white, a few blue-white or warm; a small fraction are larger
- * and brighter. Per-vertex size is injected into PointsMaterial via
- * onBeforeCompile, since PointsMaterial otherwise exposes only a single size.
+ * Brightness is spread aggressively (most stars dim, a few bright) and folded
+ * into both color and size, so with additive blending faint stars sink into
+ * black rather than reading as a uniform grid of grey dots. Per-vertex size is
+ * injected into PointsMaterial via onBeforeCompile, since PointsMaterial
+ * otherwise exposes only a single size.
  */
 function createStarfield(): THREE.Points {
   const rand = mulberry32(0x5eed1234);
@@ -709,25 +715,43 @@ function createStarfield(): THREE.Points {
     positions[i * 3 + 1] = radius * cosTheta;
     positions[i * 3 + 2] = radius * sinTheta * Math.sin(phi);
 
-    // ~78% white, ~15% blue-white, ~7% warm.
+    // Base hue: ~78% white, ~15% blue-white, ~7% warm.
     const hue = rand();
+    let br: number;
+    let bg: number;
+    let bb: number;
     if (hue < 0.78) {
       const w = 0.9 + rand() * 0.1;
-      colors[i * 3] = w;
-      colors[i * 3 + 1] = w;
-      colors[i * 3 + 2] = w;
+      br = w;
+      bg = w;
+      bb = w;
     } else if (hue < 0.93) {
-      colors[i * 3] = 0.78;
-      colors[i * 3 + 1] = 0.86;
-      colors[i * 3 + 2] = 1.0;
+      br = 0.78;
+      bg = 0.86;
+      bb = 1.0;
     } else {
-      colors[i * 3] = 1.0;
-      colors[i * 3 + 1] = 0.92;
-      colors[i * 3 + 2] = 0.8;
+      br = 1.0;
+      bg = 0.92;
+      bb = 0.8;
     }
 
-    // Most stars 0.8-2.2; ~3% brighter "feature" stars up to 3.5.
-    sizes[i] = rand() < 0.03 ? 2.2 + rand() * 1.3 : 0.8 + rand() * 1.4;
+    // Brightness tier: ~70% dim, ~24% mid, ~6% bright. Fold brightness into
+    // color so dim stars sink toward black under additive blending.
+    const tier = rand();
+    let brightness: number;
+    if (tier < 0.7) {
+      brightness = 0.25 + rand() * 0.25; // dim
+    } else if (tier < 0.94) {
+      brightness = 0.5 + rand() * 0.3; // mid
+    } else {
+      brightness = 0.8 + rand() * 0.2; // bright
+    }
+    colors[i * 3] = br * brightness;
+    colors[i * 3 + 1] = bg * brightness;
+    colors[i * 3 + 2] = bb * brightness;
+
+    // Size also scales with brightness, so dim stars are small specks.
+    sizes[i] = (1.4 + rand() * 1.4) * brightness;
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -742,6 +766,7 @@ function createStarfield(): THREE.Points {
     sizeAttenuation: true,
     transparent: true,
     depthWrite: false,
+    blending: THREE.AdditiveBlending,
   });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader =
