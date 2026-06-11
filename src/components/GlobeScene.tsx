@@ -46,6 +46,14 @@ const IDLE_RESUME_MS = 8000;
 const GLOW_SCALE = 1.06;
 const GLOW_COLOR = new THREE.Color(0.45, 0.7, 1.0);
 
+// The outer glow reads as sunlight scattering through the atmosphere at the
+// day-side limb. On the night side there is no sunlight to scatter, and at
+// GLOW_INTENSITY_DAY the night bloom (BLOOM_NIGHT_STRENGTH) smears this halo
+// into a broad wash that buries terrain detail, pins, and city lights -- so
+// it is switched off in night mode.
+const GLOW_INTENSITY_DAY = 1.6;
+const GLOW_INTENSITY_NIGHT = 0;
+
 // Pin sprite scale. sizeAttenuation is off, so pins hold a constant screen
 // size at every zoom level; selected pins scale up. With a non-attenuated
 // three.js sprite the scale is in clip-space units (not pixels), so these
@@ -80,6 +88,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const controlsRef = useRef<ReturnType<GlobeInstance['controls']> | null>(null);
   const cloudsRef = useRef<THREE.Mesh | null>(null);
   const glowRef = useRef<THREE.Mesh | null>(null);
+  const glowMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
   const starfieldRef = useRef<THREE.Points | null>(null);
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
   const outputPassRef = useRef<OutputPass | null>(null);
@@ -220,6 +229,9 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     const glowMaterial = new THREE.ShaderMaterial({
       uniforms: {
         glowColor: { value: GLOW_COLOR },
+        glowIntensity: {
+          value: lightingModeRef.current === 'night' ? GLOW_INTENSITY_NIGHT : GLOW_INTENSITY_DAY,
+        },
       },
       vertexShader: atmosphereGlowVertexShader,
       fragmentShader: atmosphereGlowFragmentShader,
@@ -230,6 +242,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     });
     const glowMesh = new THREE.Mesh(new THREE.SphereGeometry(globeRadius * GLOW_SCALE, 64, 64), glowMaterial);
     glowRef.current = glowMesh;
+    glowMaterialRef.current = glowMaterial;
     globe.scene().add(glowMesh);
 
     // --- Procedural starfield (replaces the old night-sky PNG) --------------
@@ -466,6 +479,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         glowRef.current.geometry.dispose();
         (glowRef.current.material as THREE.Material).dispose();
         glowRef.current = null;
+        glowMaterialRef.current = null;
       }
 
       if (starfieldRef.current) {
@@ -588,6 +602,17 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     // Threshold is mode-based; strength is set per frame (zoom-scaled) in the
     // rAF loop, so it is not touched here.
     bloom.threshold = (props.lightingMode ?? 'day') === 'day' ? 0.85 : 0.7;
+  }, [props.lightingMode]);
+
+  // --- Mode-aware atmosphere glow ---------------------------------------------
+  // The outer halo reads as day-side atmospheric scattering; switch it off at
+  // night so it doesn't bloom into a wash over the dark terrain, pins, and
+  // city lights.
+  useEffect(() => {
+    const glow = glowMaterialRef.current;
+    if (!glow) return;
+    glow.uniforms.glowIntensity.value =
+      (props.lightingMode ?? 'day') === 'night' ? GLOW_INTENSITY_NIGHT : GLOW_INTENSITY_DAY;
   }, [props.lightingMode]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
