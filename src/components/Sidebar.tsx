@@ -199,7 +199,7 @@ export default function Sidebar({ tree }: SidebarProps) {
       {/* Desktop sidebar */}
       <nav
         aria-label="Place navigation"
-        className="glass-panel pointer-events-auto fixed left-4 top-1/2 z-20 hidden max-h-[70vh] w-[300px] -translate-y-1/2 flex-col overflow-hidden p-3 md:flex"
+        className="glass-panel glass-panel--solid pointer-events-auto fixed left-4 top-1/2 z-20 hidden max-h-[70vh] w-[300px] -translate-y-1/2 flex-col overflow-hidden p-3 md:flex"
       >
         <h2 className="ac-label px-2">Places</h2>
         {treeContent}
@@ -221,7 +221,7 @@ export default function Sidebar({ tree }: SidebarProps) {
       {mobileOpen && (
         <div
           id="sidebar-mobile-sheet"
-          className="glass-panel pointer-events-auto fixed bottom-16 left-3 right-3 z-30 max-h-[50vh] overflow-hidden p-3 md:hidden"
+          className="glass-panel glass-panel--solid pointer-events-auto fixed bottom-16 left-3 right-3 z-30 max-h-[50vh] overflow-hidden p-3 md:hidden"
         >
           <h2 className="ac-label px-2">Places</h2>
           {treeContent}

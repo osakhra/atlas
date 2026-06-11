@@ -538,7 +538,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     }
   }, [props.lightingMode]);
 
-  return <div ref={containerRef} className="absolute inset-0 md:left-[340px]" />;
+  return <div ref={containerRef} className="absolute inset-0" />;
 });
 
 /**

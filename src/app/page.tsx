@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
+import { CameraIcon, XIcon } from '@/components/icons/Icons';
 import Legend from '@/components/Legend';
 import LightingToggle from '@/components/LightingToggle';
 import LocationCard from '@/components/LocationCard';
@@ -24,10 +25,39 @@ const flatPlaces = flattenPlaces(places);
 function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void }) {
   const { selected, select } = useSelection();
   const [lightingMode, setLightingMode] = useState<LightingMode>(defaultLightingMode());
+  const [captureMode, setCaptureMode] = useState(false);
+  const [chromeHidden, setChromeHidden] = useState(false);
 
   const toggleLightingMode = () => {
     setLightingMode((mode) => (mode === 'day' ? 'night' : 'day'));
   };
+
+  // Capture mode: fade the UI chrome out (200ms), then mark it hidden so it
+  // also leaves the accessibility tree and focus order. Reduced motion skips
+  // the fade and hides instantly.
+  useEffect(() => {
+    if (!captureMode) {
+      setChromeHidden(false);
+      return;
+    }
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      setChromeHidden(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setChromeHidden(true), 200);
+    return () => window.clearTimeout(timer);
+  }, [captureMode]);
+
+  // Esc exits capture mode.
+  useEffect(() => {
+    if (!captureMode) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCaptureMode(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [captureMode]);
 
   // Deep link: select a place from the URL hash on first load.
   useEffect(() => {
@@ -56,13 +86,46 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
         />
       </div>
 
-      <Header />
-      <Sidebar tree={places} />
-      <LocationCard />
-      <div className="pointer-events-none fixed right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-4 sm:top-4">
-        <LightingToggle mode={lightingMode} onToggle={toggleLightingMode} />
-        <Legend />
+      {/* UI chrome. In capture mode it fades out, then goes fully hidden. */}
+      <div
+        className={`transition-opacity duration-200 motion-reduce:transition-none ${
+          captureMode ? 'pointer-events-none opacity-0' : 'opacity-100'
+        } ${chromeHidden ? 'invisible' : ''}`}
+        aria-hidden={captureMode}
+      >
+        <Header />
+        <Sidebar tree={places} />
+        <LocationCard />
+        <div className="pointer-events-none fixed right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-4 sm:top-4">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCaptureMode(true)}
+              aria-label="Enter capture mode"
+              className="glass-panel pointer-events-auto inline-flex items-center justify-center p-2 text-text-secondary transition-colors duration-200 hover:text-accent-teal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-teal"
+            >
+              <CameraIcon size={15} />
+            </button>
+            <LightingToggle mode={lightingMode} onToggle={toggleLightingMode} />
+          </div>
+          <Legend />
+        </div>
       </div>
+
+      {/* Exit-capture chip: only in capture mode, low opacity until hover/focus. */}
+      {captureMode && (
+        <button
+          type="button"
+          onClick={() => setCaptureMode(false)}
+          aria-label="Exit capture mode"
+          autoFocus
+          className="glass-panel pointer-events-auto fixed right-3 top-3 z-30 inline-flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs text-text-secondary opacity-40 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-teal sm:right-4 sm:top-4"
+        >
+          <XIcon size={13} />
+          <span>Exit</span>
+        </button>
+      )}
+
       <Preloader visible={!ready} />
     </>
   );

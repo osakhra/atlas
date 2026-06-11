@@ -103,12 +103,19 @@
     @apply mx-auto max-w-6xl px-6 sm:px-8;
   }
 
-  /* === GLASS PANELS === */
+  /* === GLASS PANELS ===
+   * Full-bleed globe behind the UI means real content to blur, so the glass
+   * runs more transparent with a stronger blur + saturation lift. Panels that
+   * sit over bright globe areas (sidebar) bump opacity up to keep text legible
+   * via .glass-panel--solid. */
   .glass-panel {
     @apply rounded-xl border;
-    background-color: rgba(13, 17, 23, 0.72);
-    backdrop-filter: blur(12px);
-    border-color: rgba(130, 148, 166, 0.18);
+    background-color: rgba(13, 17, 23, 0.52);
+    backdrop-filter: blur(18px) saturate(1.4);
+    border-color: rgba(130, 148, 166, 0.22);
+  }
+  .glass-panel--solid {
+    background-color: rgba(13, 17, 23, 0.62);
   }
 
   /* === TAGS / PILLS === */
