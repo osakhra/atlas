@@ -123,10 +123,10 @@ void main() {
   float cloudShadow = texture2D(cloudTexture, vec2(fract(vUv.x - cloudOffset), vUv.y)).a;
   color *= 1.0 - cloudShadow * CLOUD_SHADOW_STRENGTH * blend;
 
-  // Midtone lift/contrast (day side reads brighter and softer than raw
-  // satellite imagery; night side city lights pass through unchanged
-  // because they are already handled above via the night/day mix).
-  color = pow(color, vec3(GRADE_GAMMA)) * GRADE_GAIN;
+  // Midtone lift/contrast on the day side only. Weighting by blend keeps the
+  // grade from lifting (and greying) the crushed night side.
+  vec3 graded = pow(color, vec3(GRADE_GAMMA)) * GRADE_GAIN;
+  color = mix(color, graded, blend);
 
   // Atmosphere edge: bluish wash toward the limb (both sides), plus a
   // brighter additive rim on the day side that bloom fuses with the halo.
