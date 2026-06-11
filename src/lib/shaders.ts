@@ -57,8 +57,8 @@ vec3 perturbNormal2Arb(vec3 eyePos, vec3 surfNormal, vec3 mapN) {
 // sun direction is now usually close to the view direction in day mode),
 // a low shininess spreads the highlight across a large fraction of the
 // visible disc and blows out under bloom -- keep this tight.
-const float SPEC_SHININESS = 240.0;
-const float SPEC_STRENGTH = 0.45;
+const float SPEC_SHININESS = 600.0;
+const float SPEC_STRENGTH = 0.15;
 
 // Color grading: midtone lift/contrast applied to the blended day/night
 // color. GRADE_GAMMA < 1 lifts shadows/midtones; GRADE_GAIN brightens
