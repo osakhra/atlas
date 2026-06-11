@@ -54,6 +54,11 @@ const PIN_SELECTED_SCALE = 0.04;
 // body never intersects the surface; a tiny altitude keeps the tip on it.
 const PIN_OBJECT_ALTITUDE = 0.005;
 
+// Bloom strength per lighting mode, before per-frame zoom scaling (see the
+// rAF loop). Threshold stays mode-based and is set in the mode effect.
+const BLOOM_DAY_STRENGTH = 0.3;
+const BLOOM_NIGHT_STRENGTH = 0.5;
+
 // Procedural starfield: point count and base sprite size. Stars live on a
 // thick shell far outside the globe; sizeAttenuation shrinks distant points,
 // so the base size is tuned up to keep them crisp and visible.
@@ -399,6 +404,19 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         sunDirection.lerp(targetSunDirection, damping).normalize();
       }
 
+      // Zoom-aware bloom: keep the mode-based threshold, but damp bloom
+      // strength as the camera moves in so close night cities read as crisp
+      // points with a soft glow rather than blowing into white blobs. Far
+      // out, bloom is at full mode strength.
+      const bloom = bloomPassRef.current;
+      if (bloom) {
+        const baseStrength =
+          lightingModeRef.current === 'night' ? BLOOM_NIGHT_STRENGTH : BLOOM_DAY_STRENGTH;
+        const alt = globe.pointOfView().altitude;
+        const zoomK = THREE.MathUtils.clamp((alt - 0.3) / (1.6 - 0.3), 0.35, 1.0);
+        bloom.strength = baseStrength * zoomK;
+      }
+
       rafId = requestAnimationFrame(animate);
     };
     rafId = requestAnimationFrame(animate);
@@ -557,13 +575,9 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   useEffect(() => {
     const bloom = bloomPassRef.current;
     if (!bloom) return;
-    if ((props.lightingMode ?? 'day') === 'day') {
-      bloom.threshold = 0.85;
-      bloom.strength = 0.3;
-    } else {
-      bloom.threshold = 0.7;
-      bloom.strength = 0.5;
-    }
+    // Threshold is mode-based; strength is set per frame (zoom-scaled) in the
+    // rAF loop, so it is not touched here.
+    bloom.threshold = (props.lightingMode ?? 'day') === 'day' ? 0.85 : 0.7;
   }, [props.lightingMode]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
