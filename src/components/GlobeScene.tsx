@@ -242,8 +242,12 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     // Pure-black (OLED) space void. The full-bleed canvas covers the
     // viewport, so this is what reads as "space"; the brand --bg-primary
-    // token stays as-is behind the glass UI.
-    renderer.setClearColor(0x000000, 1);
+    // token stays as-is behind the glass UI. three-render-objects defaults
+    // backgroundColor to '#000011' (a dark navy) and re-applies it via
+    // renderer.setClearColor on its own render cycle, silently overriding a
+    // plain renderer.setClearColor call -- go through globe.gl's own
+    // backgroundColor API so the override sticks.
+    globe.backgroundColor('#000000');
 
     const maxTextureSize = renderer.capabilities.maxTextureSize;
     const dayTextureUrl = maxTextureSize >= 8192 ? '/textures/earth-day-8k.jpg' : '/textures/earth-day-4k.jpg';
