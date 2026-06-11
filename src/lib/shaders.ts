@@ -100,6 +100,9 @@ const float TERM_WIDTH = 0.18;
 const float TERM_STRENGTH = 0.5;
 const vec3 TERM_COLOR = vec3(1.0, 0.55, 0.30);
 
+// Day-side saturation lift: the raw day ocean reads slightly grey. Gentle.
+const float SAT_BOOST = 0.18;
+
 void main() {
   vec3 surfaceNormal = normalize(vWorldNormal);
   vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
@@ -138,6 +141,10 @@ void main() {
   // grade from lifting (and greying) the crushed night side.
   vec3 graded = pow(color, vec3(GRADE_GAMMA)) * GRADE_GAIN;
   color = mix(color, graded, blend);
+
+  // Gently boost day-side saturation so the ocean reads less grey.
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  color = mix(vec3(luma), color, 1.0 + SAT_BOOST * blend);
 
   // Atmosphere edge: bluish wash toward the limb (both sides), plus a
   // brighter additive rim on the day side that bloom fuses with the halo.
