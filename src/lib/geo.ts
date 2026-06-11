@@ -54,20 +54,24 @@ export function centroidOf(place: Place): { lat: number; lng: number } | null {
   return { lat: sumLat / count, lng: sumLng / count };
 }
 
-/** Camera altitude (globe.gl pointOfView units) per tier. */
+/**
+ * Camera altitude (globe.gl pointOfView units) per tier. Kept deliberately
+ * far (iPhone-Earth distance): even the closest tier still shows regional
+ * context rather than diving to where the texture blurs.
+ */
 export function altitudeForTier(tier: Tier): number {
   switch (tier) {
     case 'continent':
-      return 1.6;
+      return 1.9;
     case 'country':
-      return 1.0;
+      return 1.4;
     case 'state':
-      return 0.6;
+      return 1.1;
     case 'island':
-      return 0.45;
+      return 1.0;
     case 'city':
-      return 0.32;
+      return 0.9;
     case 'poi':
-      return 0.24;
+      return 0.85;
   }
 }

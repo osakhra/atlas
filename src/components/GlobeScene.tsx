@@ -71,7 +71,7 @@ const STAR_BASE_SIZE = 6;
 const SUN_LERP_TAU = MODE_TRANSITION_MS / 1000 / 3;
 
 // Opening camera position: Earth filling most of the frame.
-const OPENING_VIEW = { lat: 20, lng: -85, altitude: 1.35 };
+const OPENING_VIEW = { lat: 20, lng: -85, altitude: 1.6 };
 
 const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeScene(props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
