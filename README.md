@@ -52,7 +52,9 @@ imagery (no attribution required, credited here for reference):
   downscaled to 4096x2048. Used as data textures (ocean mask and terrain
   relief), loaded with `THREE.NoColorSpace`. Attribution: "2K Earth textures
   by Solar System Scope, https://www.solarsystemscope.com/textures/, CC BY 4.0."
-- `night-sky.png`: starfield background (see Phase 0).
+
+The starfield is generated procedurally at runtime (a seeded `THREE.Points`
+shell in `GlobeScene.tsx`), so there is no sky texture to host.
 
 ## Build / static export
 
@@ -84,6 +86,6 @@ src/
   components/     # GlobeScene, Sidebar, LocationCard, Legend, Header, Preloader
   data/           # places.ts (canonical), site.ts, tokens.ts
   lib/            # types.ts, geo.ts, selection.tsx, sun.ts, shaders.ts
-public/textures/  # self-hosted Earth/cloud/starfield textures
+public/textures/  # self-hosted Earth and cloud textures (sky is procedural)
 scripts/          # check-data.ts (data validation)
 ```

@@ -54,6 +54,12 @@ const PIN_OBJECT_ALTITUDE = 0.005;
 
 const CLOUDS_OPACITY = 0.18;
 
+// Procedural starfield: point count and base sprite size. Stars live on a
+// thick shell far outside the globe; sizeAttenuation shrinks distant points,
+// so the base size is tuned up to keep them crisp and visible.
+const STAR_COUNT = 2400;
+const STAR_BASE_SIZE = 6;
+
 // Time constant for the per-frame sun-direction lerp, derived so a mode
 // toggle reaches ~95% of its new position after MODE_TRANSITION_MS.
 const SUN_LERP_TAU = MODE_TRANSITION_MS / 1000 / 3;
@@ -67,6 +73,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const controlsRef = useRef<ReturnType<GlobeInstance['controls']> | null>(null);
   const cloudsRef = useRef<THREE.Mesh | null>(null);
   const glowRef = useRef<THREE.Mesh | null>(null);
+  const starfieldRef = useRef<THREE.Points | null>(null);
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
   const outputPassRef = useRef<OutputPass | null>(null);
   const reducedMotionRef = useRef(false);
@@ -149,7 +156,6 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     };
 
     const globe = new Globe(container)
-      .backgroundImageUrl('/textures/night-sky.png')
       .atmosphereAltitude(0)
       .objectsData(placesRef.current)
       .objectLat((d) => (d as Place).lat ?? 0)
@@ -218,6 +224,11 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     const glowMesh = new THREE.Mesh(new THREE.SphereGeometry(globeRadius * GLOW_SCALE, 64, 64), glowMaterial);
     glowRef.current = glowMesh;
     globe.scene().add(glowMesh);
+
+    // --- Procedural starfield (replaces the old night-sky PNG) --------------
+    const starfield = createStarfield();
+    starfieldRef.current = starfield;
+    globe.scene().add(starfield);
 
     // --- Day/night shader material + cloud layer, once textures load --------
     const renderer = globe.renderer();
@@ -421,6 +432,15 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         glowRef.current = null;
       }
 
+      if (starfieldRef.current) {
+        globe.scene().remove(starfieldRef.current);
+        starfieldRef.current.geometry.dispose();
+        const starMat = starfieldRef.current.material as THREE.PointsMaterial;
+        starMat.map?.dispose();
+        starMat.dispose();
+        starfieldRef.current = null;
+      }
+
       if (bloomPassRef.current) {
         composer.removePass(bloomPassRef.current);
         bloomPassRef.current.dispose();
@@ -610,6 +630,105 @@ function createPinTexture(color: string): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
   return texture;
+}
+
+/** Small deterministic PRNG so the starfield is identical on every load. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Soft circular sprite for star points (radial gradient, transparent rim). */
+function createStarTexture(): THREE.CanvasTexture {
+  const size = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Builds the static starfield: STAR_COUNT points scattered on a thick shell
+ * (radius 1800-2400) with a seeded PRNG so the sky is identical across loads.
+ * Most stars are white, a few blue-white or warm; a small fraction are larger
+ * and brighter. Per-vertex size is injected into PointsMaterial via
+ * onBeforeCompile, since PointsMaterial otherwise exposes only a single size.
+ */
+function createStarfield(): THREE.Points {
+  const rand = mulberry32(0x5eed1234);
+  const positions = new Float32Array(STAR_COUNT * 3);
+  const colors = new Float32Array(STAR_COUNT * 3);
+  const sizes = new Float32Array(STAR_COUNT);
+
+  for (let i = 0; i < STAR_COUNT; i++) {
+    // Uniform random direction on the sphere, random radius within the shell.
+    const cosTheta = rand() * 2 - 1;
+    const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
+    const phi = rand() * Math.PI * 2;
+    const radius = 1800 + rand() * 600;
+    positions[i * 3] = radius * sinTheta * Math.cos(phi);
+    positions[i * 3 + 1] = radius * cosTheta;
+    positions[i * 3 + 2] = radius * sinTheta * Math.sin(phi);
+
+    // ~78% white, ~15% blue-white, ~7% warm.
+    const hue = rand();
+    if (hue < 0.78) {
+      const w = 0.9 + rand() * 0.1;
+      colors[i * 3] = w;
+      colors[i * 3 + 1] = w;
+      colors[i * 3 + 2] = w;
+    } else if (hue < 0.93) {
+      colors[i * 3] = 0.78;
+      colors[i * 3 + 1] = 0.86;
+      colors[i * 3 + 2] = 1.0;
+    } else {
+      colors[i * 3] = 1.0;
+      colors[i * 3 + 1] = 0.92;
+      colors[i * 3 + 2] = 0.8;
+    }
+
+    // Most stars 0.8-2.2; ~3% brighter "feature" stars up to 3.5.
+    sizes[i] = rand() < 0.03 ? 2.2 + rand() * 1.3 : 0.8 + rand() * 1.4;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+  const material = new THREE.PointsMaterial({
+    size: STAR_BASE_SIZE,
+    map: createStarTexture(),
+    vertexColors: true,
+    sizeAttenuation: true,
+    transparent: true,
+    depthWrite: false,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader =
+      'attribute float aSize;\n' +
+      shader.vertexShader.replace('gl_PointSize = size;', 'gl_PointSize = size * aSize;');
+  };
+
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  return points;
 }
 
 function categoryColor(category: Place['category']): string {
