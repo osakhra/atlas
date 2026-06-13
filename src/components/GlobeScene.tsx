@@ -383,6 +383,19 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     // globe.gl already drives an EffectComposer with a RenderPass; add bloom
     // and a final output pass to it rather than building a custom pipeline.
     const composer = globe.postProcessingComposer();
+
+    // Anti-alias the post-processing pipeline. globe.gl builds the composer's
+    // render targets without multisampling, so the canvas-level `antialias` is
+    // bypassed and the bloomed scene aliases; under the constant autorotate
+    // that aliasing crawls a fraction of a pixel each frame and reads as
+    // shimmer/sparkle on the city lights, limb, clouds, and pins. WebGL2
+    // multisampled render targets resolve it: the scene renders into the MSAA
+    // target and three resolves it to a clean texture before bloom samples it.
+    // `samples` persists across the library's resize (setSize keeps samples).
+    const MSAA_SAMPLES = 4;
+    composer.renderTarget1.samples = MSAA_SAMPLES;
+    composer.renderTarget2.samples = MSAA_SAMPLES;
+
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(container.clientWidth, container.clientHeight),
       0.35, // strength (per-frame mode + zoom scaled below)
