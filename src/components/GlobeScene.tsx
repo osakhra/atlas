@@ -38,6 +38,14 @@ const CLOUD_REVOLUTION_SECONDS = 40 * 60;
 const CLOUD_ANGULAR_SPEED = (2 * Math.PI) / CLOUD_REVOLUTION_SECONDS; // rad/sec
 const IDLE_RESUME_MS = 8000;
 
+// Upper bound on the per-frame delta used for cloud rotation and the sun
+// direction lerp. Without this, a long gap between frames (tab hidden, OS
+// sleep/resume, a slow synchronous task) produces one huge delta on the next
+// frame, which pops the cloud shell (and its shadow offset) to a new
+// rotation instantly. Clamping caps that single-frame jump to a fraction of
+// a second's worth of motion, which is imperceptible during normal playback.
+const MAX_FRAME_DELTA = 0.1;
+
 // Outer atmosphere halo sphere, relative to the globe radius (100). Must
 // stay below 100 * (1 + minimum camera altitude) -- the closest tier (poi)
 // is 0.85, so the ceiling is 185. A slim 1.06, combined with the shader's
@@ -410,7 +418,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     let rafId: number | null = null;
     let lastTime = performance.now();
     const animate = (time: number) => {
-      const delta = (time - lastTime) / 1000;
+      const delta = Math.min((time - lastTime) / 1000, MAX_FRAME_DELTA);
       lastTime = time;
       if (!reducedMotionRef.current && cloudsRef.current) {
         cloudsRef.current.rotation.y += CLOUD_ANGULAR_SPEED * delta;
