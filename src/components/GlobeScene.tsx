@@ -359,6 +359,8 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     controls.enableZoom = false;
     controls.enablePan = false;
     controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.rotateSpeed = 0.3;
     controls.autoRotate = !reducedMotionRef.current;
     controls.autoRotateSpeed = 0.35;
 
