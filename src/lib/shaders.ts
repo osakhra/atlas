@@ -103,6 +103,14 @@ const vec3 TERM_COLOR = vec3(1.0, 0.55, 0.30);
 // Day-side saturation lift: the raw day ocean reads slightly grey. Gentle.
 const float SAT_BOOST = 0.18;
 
+// Polar seam fade: equirectangular textures converge to a point at each
+// pole, which magnifies texel and normal-map noise into a radial starburst.
+// POLE_FADE_START is how far toward the pole (in vUv.y, 0-1) the fade
+// begins; POLE_FADE_STRENGTH is how much of the flat ice tone replaces the
+// underlying color at the very pole.
+const float POLE_FADE_START = 0.965;
+const float POLE_FADE_STRENGTH = 0.6;
+
 void main() {
   vec3 surfaceNormal = normalize(vWorldNormal);
   vec3 mapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
@@ -153,6 +161,17 @@ void main() {
   vec3 atmTint = mix(HAZE_COLOR, vec3(0.85, 0.93, 1.0), rimEdge);
   color = mix(color, atmTint, rimEdge * HAZE_STRENGTH * blend);
   color += vec3(0.75, 0.88, 1.0) * pow(rimEdge, 3.5) * RIM_BRIGHT * blend;
+
+  // Polar seam fade: equirectangular textures converge to a point at each
+  // pole, producing a radial starburst artifact at high latitude. Softly
+  // blend toward a flat tone near the poles to mask it. vUv.y is 0 at one
+  // pole, 1 at the other (standard equirectangular V mapping).
+  float poleDist = max(
+    smoothstep(POLE_FADE_START, 1.0, vUv.y),
+    smoothstep(POLE_FADE_START, 1.0, 1.0 - vUv.y)
+  );
+  vec3 poleFlat = vec3(0.85, 0.88, 0.92); // soft ice-tone, blends with white caps
+  color = mix(color, poleFlat, poleDist * POLE_FADE_STRENGTH);
 
   gl_FragColor = vec4(color, 1.0);
 }
