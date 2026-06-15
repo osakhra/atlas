@@ -24,6 +24,7 @@ export const places: Place[] = [
               { id: 'tampa', name: 'Tampa', tier: 'city', category: 'lived', lat: 27.9506, lng: -82.4572 },
               { id: 'orlando', name: 'Orlando', tier: 'city', category: 'lived', lat: 28.5383, lng: -81.3792 },
               { id: 'sebastian', name: 'Sebastian', tier: 'city', category: 'lived', lat: 27.8164, lng: -80.4706 },
+              { id: 'key-west', name: 'Key West', tier: 'city', category: 'vacationed', lat: 24.5551, lng: -81.7800 },
             ],
           },
           {
@@ -42,6 +43,9 @@ export const places: Place[] = [
               { id: 'sugar-land', name: 'Sugar Land', tier: 'city', category: 'lived', lat: 29.6197, lng: -95.6349 },
               { id: 'lubbock', name: 'Lubbock', tier: 'city', category: 'vacationed', lat: 33.5779, lng: -101.8552 },
               { id: 'laredo', name: 'Laredo', tier: 'city', category: 'work', lat: 27.5306, lng: -99.4803 },
+              { id: 'austin', name: 'Austin', tier: 'city', category: 'vacationed', lat: 30.2672, lng: -97.7431 },
+              { id: 'dallas', name: 'Dallas', tier: 'city', category: 'vacationed', lat: 32.7767, lng: -96.7970 },
+              { id: 'amarillo', name: 'Amarillo', tier: 'city', category: 'vacationed', lat: 35.2220, lng: -101.8313 },
             ],
           },
           {
@@ -136,6 +140,15 @@ export const places: Place[] = [
               { id: 'charleston', name: 'Charleston', tier: 'city', category: 'work', lat: 32.7765, lng: -79.9311 },
             ],
           },
+          {
+            id: 'georgia',
+            name: 'Georgia',
+            tier: 'state',
+            children: [
+              { id: 'atlanta', name: 'Atlanta', tier: 'city', category: 'vacationed', lat: 33.7490, lng: -84.3880 },
+              { id: 'tiger', name: 'Tiger', tier: 'city', category: 'vacationed', lat: 34.8843, lng: -83.4774 },
+            ],
+          },
         ],
       },
       {
@@ -144,6 +157,14 @@ export const places: Place[] = [
         tier: 'country',
         children: [
           { id: 'grano-de-oro', name: 'Grano de Oro', tier: 'city', category: 'work', lat: 9.8438, lng: -83.6912 },
+        ],
+      },
+      {
+        id: 'bahamas',
+        name: 'Bahamas',
+        tier: 'country',
+        children: [
+          { id: 'nassau', name: 'Nassau', tier: 'city', category: 'vacationed', lat: 25.0480, lng: -77.3554 },
         ],
       },
     ],
@@ -161,6 +182,7 @@ export const places: Place[] = [
           { id: 'oberstaufenbach', name: 'Oberstaufenbach', tier: 'city', category: 'lived', lat: 49.555, lng: 7.553 },
           { id: 'hamburg', name: 'Hamburg', tier: 'city', category: 'vacationed', lat: 53.5511, lng: 9.9937 },
           { id: 'lennestadt', name: 'Lennestadt', tier: 'city', category: 'vacationed', lat: 51.1167, lng: 8.0667 },
+          { id: 'garmisch-partenkirchen', name: 'Garmisch-Partenkirchen', tier: 'city', category: 'vacationed', lat: 47.4924, lng: 11.0961 },
         ],
       },
       {
