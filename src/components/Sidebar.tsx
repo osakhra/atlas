@@ -189,7 +189,7 @@ export default function Sidebar({ tree }: SidebarProps) {
   };
 
   const treeContent = (
-    <div role="tree" aria-label="Places" className="flex flex-col gap-0.5 overflow-y-auto">
+    <div role="tree" aria-label="Places" className="flex flex-col gap-0.5 overflow-y-auto flex-1 min-h-0">
       {visibleRows.map(renderRow)}
     </div>
   );
@@ -221,7 +221,7 @@ export default function Sidebar({ tree }: SidebarProps) {
       {mobileOpen && (
         <div
           id="sidebar-mobile-sheet"
-          className="glass-panel glass-panel--solid pointer-events-auto fixed bottom-16 left-3 right-3 z-30 max-h-[50vh] overflow-hidden p-3 md:hidden"
+          className="glass-panel glass-panel--solid pointer-events-auto fixed bottom-16 left-3 right-3 z-30 flex flex-col max-h-[50vh] overflow-hidden p-3 md:hidden"
         >
           <h2 className="ac-label px-2">Places</h2>
           {treeContent}
