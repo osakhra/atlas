@@ -179,7 +179,14 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       return sprite;
     };
 
-    const globe = new Globe(container)
+    // Pass powerPreference through globe.gl's rendererConfig so multi-GPU
+    // systems (e.g. integrated Intel + discrete NVIDIA/AMD) use the discrete
+    // GPU. This reaches the WebGLRenderer constructor directly via the official
+    // ConfigOptions API -- more reliable than pre-creating a canvas, and no
+    // context-ownership race.
+    const globe = new Globe(container, {
+      rendererConfig: { powerPreference: 'high-performance' },
+    })
       .atmosphereAltitude(0)
       .objectsData(placesRef.current)
       .objectLat((d) => (d as Place).lat ?? 0)
@@ -197,6 +204,9 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       .height(container.clientHeight);
 
     globeRef.current = globe;
+    // eslint-disable-next-line no-console
+    console.log('[atlas] WebGL renderer:', globe.renderer().domElement,
+      'GPU:', globe.renderer().info.render);
 
     // Opening view: Earth massive, filling most of the frame. Set instantly
     // (0ms) so there's no fly-in animation on first paint.
