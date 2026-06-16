@@ -25,6 +25,7 @@ export const places: Place[] = [
               { id: 'orlando', name: 'Orlando', tier: 'city', category: 'lived', lat: 28.5383, lng: -81.3792 },
               { id: 'sebastian', name: 'Sebastian', tier: 'city', category: 'lived', lat: 27.8164, lng: -80.4706 },
               { id: 'key-west', name: 'Key West', tier: 'city', category: 'vacationed', lat: 24.5551, lng: -81.7800 },
+              { id: 'tallahassee', name: 'Tallahassee', tier: 'city', category: 'vacationed', lat: 30.4518, lng: -84.2807 },
             ],
           },
           {
@@ -46,6 +47,8 @@ export const places: Place[] = [
               { id: 'austin', name: 'Austin', tier: 'city', category: 'vacationed', lat: 30.2672, lng: -97.7431 },
               { id: 'dallas', name: 'Dallas', tier: 'city', category: 'vacationed', lat: 32.7767, lng: -96.7970 },
               { id: 'amarillo', name: 'Amarillo', tier: 'city', category: 'vacationed', lat: 35.2220, lng: -101.8313 },
+              { id: 'san-antonio', name: 'San Antonio', tier: 'city', category: 'vacationed', lat: 29.4241, lng: -98.4936 },
+              { id: 'san-juan-tx', name: 'San Juan', tier: 'city', category: 'vacationed', lat: 26.1889, lng: -98.1561 },
             ],
           },
           {
@@ -147,6 +150,14 @@ export const places: Place[] = [
             children: [
               { id: 'atlanta', name: 'Atlanta', tier: 'city', category: 'vacationed', lat: 33.7490, lng: -84.3880 },
               { id: 'tiger', name: 'Tiger', tier: 'city', category: 'vacationed', lat: 34.8843, lng: -83.4774 },
+            ],
+          },
+          {
+            id: 'ohio',
+            name: 'Ohio',
+            tier: 'state',
+            children: [
+              { id: 'dayton', name: 'Dayton', tier: 'city', category: 'vacationed', lat: 39.7589, lng: -84.1916 },
             ],
           },
         ],
