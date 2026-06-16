@@ -26,6 +26,7 @@ export const places: Place[] = [
               { id: 'sebastian', name: 'Sebastian', tier: 'city', category: 'lived', lat: 27.8164, lng: -80.4706 },
               { id: 'key-west', name: 'Key West', tier: 'city', category: 'vacationed', lat: 24.5551, lng: -81.7800 },
               { id: 'tallahassee', name: 'Tallahassee', tier: 'city', category: 'vacationed', lat: 30.4518, lng: -84.2807 },
+              { id: 'pensacola', name: 'Pensacola', tier: 'city', category: 'vacationed', lat: 30.4213, lng: -87.2169 },
             ],
           },
           {
@@ -34,6 +35,7 @@ export const places: Place[] = [
             tier: 'state',
             children: [
               { id: 'vienna', name: 'Vienna', tier: 'city', category: 'lived', lat: 38.9012, lng: -77.2653 },
+              { id: 'williamsburg', name: 'Williamsburg', tier: 'city', category: 'vacationed', lat: 37.2707, lng: -76.7075 },
             ],
           },
           {
@@ -49,6 +51,7 @@ export const places: Place[] = [
               { id: 'amarillo', name: 'Amarillo', tier: 'city', category: 'vacationed', lat: 35.2220, lng: -101.8313 },
               { id: 'san-antonio', name: 'San Antonio', tier: 'city', category: 'vacationed', lat: 29.4241, lng: -98.4936 },
               { id: 'san-juan-tx', name: 'San Juan', tier: 'city', category: 'vacationed', lat: 26.1889, lng: -98.1561 },
+              { id: 'fort-davis', name: 'Fort Davis', tier: 'city', category: 'vacationed', lat: 30.5988, lng: -103.8938 },
             ],
           },
           {
@@ -81,6 +84,7 @@ export const places: Place[] = [
             children: [
               { id: 'aspen', name: 'Aspen', tier: 'city', category: 'vacationed', lat: 39.1911, lng: -106.8175 },
               { id: 'colorado-springs', name: 'Colorado Springs', tier: 'city', category: 'vacationed', lat: 38.8339, lng: -104.8214 },
+              { id: 'ridgway', name: 'Ridgway', tier: 'city', category: 'vacationed', lat: 38.1528, lng: -107.7567 },
             ],
           },
           {
@@ -100,6 +104,7 @@ export const places: Place[] = [
               { id: 'crescent-city', name: 'Crescent City', tier: 'city', category: 'vacationed', lat: 41.7558, lng: -124.2026 },
               { id: 'lake-tahoe', name: 'Lake Tahoe', tier: 'city', category: 'vacationed', lat: 39.0968, lng: -120.0324 },
               { id: 'novato', name: 'Novato', tier: 'city', category: 'vacationed', lat: 38.1074, lng: -122.5697 },
+              { id: 'sacramento', name: 'Sacramento', tier: 'city', category: 'vacationed', lat: 38.5816, lng: -121.4944 },
             ],
           },
           {
@@ -158,6 +163,14 @@ export const places: Place[] = [
             tier: 'state',
             children: [
               { id: 'dayton', name: 'Dayton', tier: 'city', category: 'vacationed', lat: 39.7589, lng: -84.1916 },
+            ],
+          },
+          {
+            id: 'wyoming',
+            name: 'Wyoming',
+            tier: 'state',
+            children: [
+              { id: 'yellowstone', name: 'Yellowstone National Park', tier: 'poi', category: 'vacationed', lat: 44.4280, lng: -110.5885 },
             ],
           },
         ],
