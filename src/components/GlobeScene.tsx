@@ -12,11 +12,36 @@ import { type LightingMode, DAY_SUN_OFFSET, NIGHT_SUN_OFFSET, MODE_TRANSITION_MS
 import {
   dayNightVertexShader,
   dayNightFragmentShader,
+  dayNightFragmentShaderLite,
   atmosphereGlowVertexShader,
   atmosphereGlowFragmentShader,
   cloudVertexShader,
   cloudFragmentShader,
 } from '@/lib/shaders';
+
+let autoDetectRan = false;
+
+function detectLowEndHardware(): boolean {
+  try {
+    const tempCanvas = document.createElement('canvas');
+    const gl = tempCanvas.getContext('webgl2') ?? tempCanvas.getContext('webgl');
+    if (gl) {
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      if (dbg) {
+        const gpu = (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) as string).toLowerCase();
+        if (['swiftshader', 'llvmpipe', 'softpipe', 'software', 'microsoft basic render driver']
+            .some((s) => gpu.includes(s)))
+          return true;
+      }
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+    }
+  } catch {
+    // context creation failed; assume capable hardware
+  }
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  if (mem !== undefined && mem <= 2) return true;
+  return false;
+}
 
 export interface GlobeSceneHandle {
   /** Imperative camera fly-to, implemented via globe.pointOfView({lat,lng,altitude}, durationMs). */
@@ -32,6 +57,10 @@ export interface GlobeSceneProps {
   lightingMode?: LightingMode;
   /** Call once after the globe textures finish loading, so the page can dismiss its Preloader. */
   onReady?: () => void;
+  /** Rendering quality tier. Defaults to 'quality'. */
+  qualityMode?: 'quality' | 'performance';
+  /** Called once on first quality-mode mount if low-end hardware is detected. */
+  onHardwareDetected?: (isLowEnd: boolean) => void;
 }
 
 const CLOUD_REVOLUTION_SECONDS = 40 * 60;
@@ -120,9 +149,11 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
   const placesRef = useRef<Place[]>(props.places);
   const selectedIdRef = useRef<string | null | undefined>(props.selectedId);
   const lightingModeRef = useRef<LightingMode>(props.lightingMode ?? 'day');
+  const qualityModeRef = useRef(props.qualityMode ?? 'quality');
   placesRef.current = props.places;
   selectedIdRef.current = props.selectedId;
   lightingModeRef.current = props.lightingMode ?? 'day';
+  qualityModeRef.current = props.qualityMode ?? 'quality';
 
   // Imperative fly-to, also used internally for selection-driven camera moves.
   const flyTo = (lat: number, lng: number, altitude: number, durationMs = 1800) => {
@@ -148,6 +179,17 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
 
     const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     reducedMotionRef.current = reducedMotionQuery.matches;
+
+    const isPerf = qualityModeRef.current === 'performance';
+
+    // Auto-detect software/CPU rendering on the first quality-mode mount only.
+    if (!autoDetectRan && !isPerf) {
+      autoDetectRan = true;
+      if (detectLowEndHardware()) {
+        props.onHardwareDetected?.(true);
+        return; // safe: no globe resources created yet
+      }
+    }
 
     // --- Pin sprite textures (one teardrop per category, cached) ------------
     // Four textures are built once and shared across all pins; never one
@@ -258,19 +300,20 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       transparent: true,
       depthWrite: false,
     });
-    const glowMesh = new THREE.Mesh(new THREE.SphereGeometry(globeRadius * GLOW_SCALE, 64, 64), glowMaterial);
+    const glowSegs = isPerf ? 32 : 64;
+    const glowMesh = new THREE.Mesh(new THREE.SphereGeometry(globeRadius * GLOW_SCALE, glowSegs, glowSegs), glowMaterial);
     glowRef.current = glowMesh;
     glowMaterialRef.current = glowMaterial;
     globe.scene().add(glowMesh);
 
     // --- Procedural starfield (replaces the old night-sky PNG) --------------
-    const starfield = createStarfield();
+    const starfield = createStarfield(isPerf ? 2000 : STAR_COUNT);
     starfieldRef.current = starfield;
     globe.scene().add(starfield);
 
     // --- Day/night shader material + cloud layer, once textures load --------
     const renderer = globe.renderer();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(isPerf ? 1.0 : Math.min(window.devicePixelRatio, 2));
     // Pure-black (OLED) space void. The full-bleed canvas covers the
     // viewport, so this is what reads as "space"; the brand --bg-primary
     // token stays as-is behind the glass UI. three-render-objects defaults
@@ -281,7 +324,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     globe.backgroundColor('#000000');
 
     const maxTextureSize = renderer.capabilities.maxTextureSize;
-    const dayTextureUrl = maxTextureSize >= 8192 ? '/textures/earth-day-8k.jpg' : '/textures/earth-day-4k.jpg';
+    const dayTextureUrl = (!isPerf && maxTextureSize >= 8192) ? '/textures/earth-day-8k.jpg' : '/textures/earth-day-4k.jpg';
 
     const textureLoader = new THREE.TextureLoader();
     const loadTexture = (url: string) =>
@@ -289,14 +332,19 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         textureLoader.load(url, resolve, undefined, reject);
       });
 
-    Promise.all([
-      loadTexture(dayTextureUrl),
-      loadTexture('/textures/earth-night.jpg'),
-      loadTexture('/textures/earth-clouds.png'),
-      loadTexture('/textures/earth-specular.jpg'),
-      loadTexture('/textures/earth-normal.jpg'),
-    ])
-      .then(([dayTexture, nightTexture, cloudsTexture, specularTexture, normalTexture]) => {
+    const textureUrls = isPerf
+      ? [dayTextureUrl, '/textures/earth-night.jpg', '/textures/earth-clouds.png']
+      : [dayTextureUrl, '/textures/earth-night.jpg', '/textures/earth-clouds.png',
+         '/textures/earth-specular.jpg', '/textures/earth-normal.jpg'];
+
+    Promise.all(textureUrls.map(loadTexture))
+      .then((textures) => {
+        const dayTexture = textures[0];
+        const nightTexture = textures[1];
+        const cloudsTexture = textures[2];
+        const specularTexture: THREE.Texture | null = isPerf ? null : textures[3];
+        const normalTexture: THREE.Texture | null = isPerf ? null : textures[4];
+
         const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
         for (const tex of [dayTexture, nightTexture]) {
           tex.colorSpace = THREE.SRGBColorSpace;
@@ -306,11 +354,13 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         cloudsTexture.colorSpace = THREE.SRGBColorSpace;
         cloudsTexture.needsUpdate = true;
 
-        // Specular and normal maps are data, not color.
-        for (const tex of [specularTexture, normalTexture]) {
-          tex.colorSpace = THREE.NoColorSpace;
-          tex.anisotropy = maxAnisotropy;
-          tex.needsUpdate = true;
+        if (specularTexture && normalTexture) {
+          // Specular and normal maps are data, not color.
+          for (const tex of [specularTexture, normalTexture]) {
+            tex.colorSpace = THREE.NoColorSpace;
+            tex.anisotropy = maxAnisotropy;
+            tex.needsUpdate = true;
+          }
         }
 
         dayTextureRef.current = dayTexture;
@@ -319,19 +369,31 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
         specularTextureRef.current = specularTexture;
         normalTextureRef.current = normalTexture;
 
-        const globeMaterial = new THREE.ShaderMaterial({
-          uniforms: {
-            dayTexture: { value: dayTexture },
-            nightTexture: { value: nightTexture },
-            specularMap: { value: specularTexture },
-            normalMap: { value: normalTexture },
-            cloudTexture: { value: cloudsTexture },
-            cloudOffset: { value: 0 },
-            sunDirection: { value: sunDirection },
-          },
-          vertexShader: dayNightVertexShader,
-          fragmentShader: dayNightFragmentShader,
-        });
+        const globeMaterial = isPerf
+          ? new THREE.ShaderMaterial({
+              uniforms: {
+                dayTexture: { value: dayTexture },
+                nightTexture: { value: nightTexture },
+                cloudTexture: { value: cloudsTexture },
+                cloudOffset: { value: 0 },
+                sunDirection: { value: sunDirection },
+              },
+              vertexShader: dayNightVertexShader,
+              fragmentShader: dayNightFragmentShaderLite,
+            })
+          : new THREE.ShaderMaterial({
+              uniforms: {
+                dayTexture: { value: dayTexture },
+                nightTexture: { value: nightTexture },
+                specularMap: { value: specularTexture },
+                normalMap: { value: normalTexture },
+                cloudTexture: { value: cloudsTexture },
+                cloudOffset: { value: 0 },
+                sunDirection: { value: sunDirection },
+              },
+              vertexShader: dayNightVertexShader,
+              fragmentShader: dayNightFragmentShader,
+            });
         globeMaterialRef.current = globeMaterial;
         globe.globeMaterial(globeMaterial);
 
@@ -348,8 +410,9 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
           depthWrite: false,
           blending: THREE.NormalBlending,
         });
+        const cloudSegs = isPerf ? 32 : 64;
         const cloudsMesh = new THREE.Mesh(
-          new THREE.SphereGeometry(globeRadius * 1.005, 64, 64),
+          new THREE.SphereGeometry(globeRadius * 1.005, cloudSegs, cloudSegs),
           cloudsMaterial
         );
         cloudsRef.current = cloudsMesh;
@@ -404,7 +467,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
     // multisampled render targets resolve it: the scene renders into the MSAA
     // target and three resolves it to a clean texture before bloom samples it.
     // `samples` persists across the library's resize (setSize keeps samples).
-    const MSAA_SAMPLES = 4;
+    const MSAA_SAMPLES = isPerf ? 0 : 4;
     composer.renderTarget1.samples = MSAA_SAMPLES;
     composer.renderTarget2.samples = MSAA_SAMPLES;
 
@@ -414,6 +477,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       0.3, // radius
       0.85 // threshold: only genuinely bright pixels (lights, tight glint) bloom
     );
+    bloomPass.enabled = !isPerf;
     composer.addPass(bloomPass);
     const outputPass = new OutputPass();
     composer.addPass(outputPass);
@@ -465,7 +529,7 @@ const GlobeScene = forwardRef<GlobeSceneHandle, GlobeSceneProps>(function GlobeS
       // points with a soft glow rather than blowing into white blobs. Far
       // out, bloom is at full mode strength.
       const bloom = bloomPassRef.current;
-      if (bloom) {
+      if (bloom && bloom.enabled) {
         const baseStrength =
           lightingModeRef.current === 'night' ? BLOOM_NIGHT_STRENGTH : BLOOM_DAY_STRENGTH;
         const alt = globe.pointOfView().altitude;
@@ -764,13 +828,13 @@ function createStarTexture(): THREE.CanvasTexture {
  * injected into PointsMaterial via onBeforeCompile, since PointsMaterial
  * otherwise exposes only a single size.
  */
-function createStarfield(): THREE.Points {
+function createStarfield(count = STAR_COUNT): THREE.Points {
   const rand = mulberry32(0x5eed1234);
-  const positions = new Float32Array(STAR_COUNT * 3);
-  const colors = new Float32Array(STAR_COUNT * 3);
-  const sizes = new Float32Array(STAR_COUNT);
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
 
-  for (let i = 0; i < STAR_COUNT; i++) {
+  for (let i = 0; i < count; i++) {
     // Uniform random direction on the sphere, random radius within the shell.
     const cosTheta = rand() * 2 - 1;
     const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);

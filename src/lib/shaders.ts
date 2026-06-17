@@ -172,6 +172,89 @@ void main() {
 `;
 
 /**
+ * Stripped-down day/night shader for performance mode. Removes the normal-map
+ * lookup and perturbNormal2Arb derivatives (the two most expensive operations)
+ * and the specular ocean-glint texture sample, dropping from 5 texture
+ * lookups to 3. Day/night blend, city-light isolation, cloud shadow,
+ * terminator band, color grading, and atmosphere rim are all preserved.
+ */
+export const dayNightFragmentShaderLite = /* glsl */ `
+uniform sampler2D dayTexture;
+uniform sampler2D nightTexture;
+uniform sampler2D cloudTexture;
+uniform float cloudOffset;
+uniform vec3 sunDirection;
+
+varying vec2 vUv;
+varying vec3 vWorldNormal;
+varying vec3 vWorldPosition;
+
+const float GRADE_GAMMA = 0.90;
+const float GRADE_GAIN = 1.06;
+
+const vec3 HAZE_COLOR = vec3(0.61, 0.76, 0.92);
+const float HAZE_RIM_POWER = 2.2;
+const float HAZE_STRENGTH = 0.42;
+const float RIM_BRIGHT = 0.55;
+
+const float CLOUD_SHADOW_STRENGTH = 0.22;
+
+const float NIGHT_LIGHT_GAIN = 3.0;
+const float NIGHT_BASE_GAIN = 0.35;
+
+const float TERM_WIDTH = 0.18;
+const float TERM_STRENGTH = 0.5;
+const vec3 TERM_COLOR = vec3(1.0, 0.55, 0.30);
+
+const float SAT_BOOST = 0.18;
+
+void main() {
+  vec3 surfaceNormal = normalize(vWorldNormal);
+  vec3 N = surfaceNormal;
+  vec3 Vd = normalize(cameraPosition - vWorldPosition);
+
+  float cosAngle = dot(N, sunDirection);
+  float blend = smoothstep(-0.08, 0.08, cosAngle);
+  vec3 nightTex = texture2D(nightTexture, vUv).rgb;
+  // Isolate warm, bright city lights from the dark earthshine base, then
+  // brighten the lights and crush the base toward black.
+  float lightMask = smoothstep(0.06, 0.20, max(nightTex.r, nightTex.g));
+  vec3 cityLights = nightTex * lightMask * NIGHT_LIGHT_GAIN;
+  vec3 nightBase = nightTex * (1.0 - lightMask) * NIGHT_BASE_GAIN;
+  vec3 night = cityLights + nightBase;
+  vec3 day = texture2D(dayTexture, vUv).rgb;
+  vec3 color = mix(night, day, blend);
+
+  // Cloud drop shadow on the day side.
+  float cloudShadow = texture2D(cloudTexture, vec2(fract(vUv.x - cloudOffset), vUv.y)).a;
+  color *= 1.0 - cloudShadow * CLOUD_SHADOW_STRENGTH * blend;
+
+  // Warm sunset band on the terminator: peaks where cosAngle is near zero.
+  float term = 1.0 - smoothstep(0.0, TERM_WIDTH, abs(cosAngle));
+  color = mix(color, color * TERM_COLOR + TERM_COLOR * 0.15, term * TERM_STRENGTH);
+
+  // Midtone lift/contrast on the day side only. Weighting by blend keeps the
+  // grade from lifting (and greying) the crushed night side.
+  vec3 graded = pow(color, vec3(GRADE_GAMMA)) * GRADE_GAIN;
+  color = mix(color, graded, blend);
+
+  // Gently boost day-side saturation so the ocean reads less grey.
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  color = mix(vec3(luma), color, 1.0 + SAT_BOOST * blend);
+
+  // Atmosphere edge: bluish wash toward the limb, plus a brighter additive
+  // rim that bloom fuses with the halo. Both gated to the day side -- the
+  // night-side limb has no sunlight to scatter, so it stays dark.
+  float rimEdge = pow(1.0 - max(dot(Vd, N), 0.0), HAZE_RIM_POWER);
+  vec3 atmTint = mix(HAZE_COLOR, vec3(0.85, 0.93, 1.0), rimEdge);
+  color = mix(color, atmTint, rimEdge * HAZE_STRENGTH * blend);
+  color += vec3(0.75, 0.88, 1.0) * pow(rimEdge, 3.5) * RIM_BRIGHT * blend;
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+/**
  * Fresnel rim-glow shader for the atmospheric halo sphere. Renders a soft
  * blue glow that hugs the limb of the planet and fades toward the center,
  * using a view-direction fresnel term so it stays correct off-center.

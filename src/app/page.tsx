@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { CameraIcon, XIcon } from '@/components/icons/Icons';
 import Legend from '@/components/Legend';
+import QualityToggle from '@/components/QualityToggle';
 import LightingToggle from '@/components/LightingToggle';
 import LocationCard from '@/components/LocationCard';
 import Preloader from '@/components/Preloader';
@@ -27,6 +28,8 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
   const [lightingMode, setLightingMode] = useState<LightingMode>(defaultLightingMode());
   const [captureMode, setCaptureMode] = useState(false);
   const [chromeHidden, setChromeHidden] = useState(false);
+  const [qualityMode, setQualityMode] = useState<'quality' | 'performance'>('quality');
+  const [globeReady, setGlobeReady] = useState(false);
 
   const toggleLightingMode = () => {
     setLightingMode((mode) => (mode === 'day' ? 'night' : 'day'));
@@ -48,6 +51,12 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
     const timer = window.setTimeout(() => setChromeHidden(true), 200);
     return () => window.clearTimeout(timer);
   }, [captureMode]);
+
+  // Reset the globe-ready flag whenever the quality mode changes so the
+  // preloader re-appears while the new GlobeScene instance loads.
+  useEffect(() => {
+    setGlobeReady(false);
+  }, [qualityMode]);
 
   // Esc exits capture mode.
   useEffect(() => {
@@ -79,10 +88,13 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
     <>
       <div className="absolute inset-0 z-0">
         <GlobeScene
+          key={qualityMode}
           places={flatPlaces}
           selectedId={selected?.id ?? null}
           lightingMode={lightingMode}
-          onReady={onReady}
+          qualityMode={qualityMode}
+          onReady={() => { setGlobeReady(true); onReady(); }}
+          onHardwareDetected={() => setQualityMode('performance')}
         />
       </div>
 
@@ -98,6 +110,10 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
         <LocationCard />
         <div className="pointer-events-none fixed right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-4 sm:top-4">
           <div className="flex items-center gap-2">
+            <QualityToggle
+              mode={qualityMode}
+              onToggle={() => setQualityMode((m) => (m === 'quality' ? 'performance' : 'quality'))}
+            />
             <button
               type="button"
               onClick={() => setCaptureMode(true)}
@@ -126,7 +142,7 @@ function AtlasShell({ ready, onReady }: { ready: boolean; onReady: () => void })
         </button>
       )}
 
-      <Preloader visible={!ready} />
+      <Preloader visible={!globeReady} />
     </>
   );
 }

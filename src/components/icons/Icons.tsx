@@ -206,3 +206,19 @@ export function CameraIcon({ className = '', size = 14 }: IconProps) {
     </svg>
   );
 }
+
+export function ZapIcon({ className = '', size = 14 }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  );
+}
+
+export function SparkleIcon({ className = '', size = 14 }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.813 1.912a2 2 0 0 1 1.287 1.287L12 21l1.912-5.813a2 2 0 0 1 1.287-1.287L21 12l-5.8-1.913a2 2 0 0 1-1.288-1.287Z" />
+    </svg>
+  );
+}
