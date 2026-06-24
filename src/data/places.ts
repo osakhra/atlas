@@ -37,6 +37,14 @@ export const places: Place[] = [
           { id: 'qasr-al-sarab', name: 'Qasr Al Sarab', tier: 'poi', category: 'vacationed', lat: 22.8991, lng: 54.3361 },
         ],
       },
+      {
+        id: 'vietnam',
+        name: 'Vietnam',
+        tier: 'country',
+        children: [
+          { id: 'bai-dai', name: 'Bai Dai (Long Beach)', tier: 'poi', category: 'planned', lat: 10.3287, lng: 103.8907 },
+        ],
+      },
     ],
   },
   {
@@ -58,6 +66,7 @@ export const places: Place[] = [
         name: 'Germany',
         tier: 'country',
         children: [
+          { id: 'berchtesgaden-salt-mine', name: 'Berchtesgaden Salt Mine', tier: 'poi', category: 'vacationed', lat: 47.6231, lng: 13.0067 },
           { id: 'frankfurt', name: 'Frankfurt', tier: 'city', category: 'vacationed', lat: 50.1109, lng: 8.6821 },
           { id: 'garmisch-partenkirchen', name: 'Garmisch-Partenkirchen', tier: 'city', category: 'vacationed', lat: 47.4924, lng: 11.0961 },
           { id: 'gunzburg', name: 'Günzburg', tier: 'city', category: 'vacationed', lat: 48.4519, lng: 10.2779 },
@@ -76,6 +85,14 @@ export const places: Place[] = [
           { id: 'rome', name: 'Rome', tier: 'city', category: 'vacationed', lat: 41.9028, lng: 12.4964 },
           { id: 'siena', name: 'Siena', tier: 'city', category: 'vacationed', lat: 43.3186, lng: 11.3307 },
           { id: 'venice', name: 'Venice', tier: 'city', category: 'vacationed', lat: 45.4408, lng: 12.3155 },
+        ],
+      },
+      {
+        id: 'malta',
+        name: 'Malta',
+        tier: 'country',
+        children: [
+          { id: 'marsaxlokk', name: 'Marsaxlokk', tier: 'city', category: 'planned', lat: 35.8419, lng: 14.5444 },
         ],
       },
       {
@@ -123,6 +140,14 @@ export const places: Place[] = [
         tier: 'country',
         children: [
           { id: 'grano-de-oro', name: 'Grano de Oro', tier: 'city', category: 'work', lat: 9.8438, lng: -83.6912 },
+        ],
+      },
+      {
+        id: 'mexico',
+        name: 'Mexico',
+        tier: 'country',
+        children: [
+          { id: 'leon', name: 'León, Guanajuato', tier: 'city', category: 'planned', lat: 21.1219, lng: -101.6850 },
         ],
       },
       {
