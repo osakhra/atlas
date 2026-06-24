@@ -66,7 +66,7 @@ export const places: Place[] = [
         name: 'Germany',
         tier: 'country',
         children: [
-          { id: 'berchtesgaden-salt-mine', name: 'Berchtesgaden Salt Mine', tier: 'poi', category: 'vacationed', lat: 47.6231, lng: 13.0067 },
+          { id: 'berchtesgaden', name: 'Berchtesgaden', tier: 'city', category: 'vacationed', lat: 47.6284, lng: 13.0008 },
           { id: 'frankfurt', name: 'Frankfurt', tier: 'city', category: 'vacationed', lat: 50.1109, lng: 8.6821 },
           { id: 'garmisch-partenkirchen', name: 'Garmisch-Partenkirchen', tier: 'city', category: 'vacationed', lat: 47.4924, lng: 11.0961 },
           { id: 'gunzburg', name: 'Günzburg', tier: 'city', category: 'vacationed', lat: 48.4519, lng: 10.2779 },
